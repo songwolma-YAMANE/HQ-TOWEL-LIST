@@ -20,22 +20,29 @@ st.sidebar.subheader("📁 데이터 파일 업로드")
 uploaded_file = st.sidebar.file_uploader("엑셀(.xlsx) 또는 CSV 파일 선택", type=["csv", "xlsx"])
 
 if uploaded_file is None:
-    st.info("👋 **[안내]** 대시보드를 시작하려면 왼쪽 사이드바의 **[파일 업로드]** 버튼을 눌러 수주/출고 관리 엑셀(.xlsx) 파일을 업로드해 주세요!\n\n파일을 업로드하시면 팀원들과 언제 어디서나 공유해서 보실 수 있습니다.")
+    st.info("👋 **[안내]** 대시보드를 시작하려면 왼쪽 사이드바의 **[파일 업로드]** 버튼을 눌러 수주/출고 관리 엑셀(.xlsx) 파일을 업로드해 주세요!")
     st.stop()
 
-# 파일 읽기 처리
+# 파일 읽기 및 진짜 제목 행(Header) 자동 탐색
 try:
     if uploaded_file.name.endswith('.csv'):
-        df_temp_file = pd.read_csv(uploaded_file, header=None)
-        header_row = 0
-        for i in range(len(df_temp_file)):
-            row_str = str(df_temp_file.iloc[i].values)
-            if '출하처' in row_str or 'SHIPMENT' in row_str or '제품명' in row_str:
-                header_row = i
-                break
+        df_temp = pd.read_csv(uploaded_file, header=None)
+    else:
+        df_temp = pd.read_excel(uploaded_file, header=None)
+
+    # '확정납기'나 '대리점', '출하처' 등의 핵심 단어가 포함된 행을 진짜 헤더로 지정
+    header_row = 0
+    for i in range(min(15, len(df_temp))):
+        row_str = str(df_temp.iloc[i].values)
+        if any(keyword in row_str for keyword in ['납기', '대리점', '출하처', '발주서', 'DELIVERY', 'AGENCY']):
+            header_row = i
+            break
+
+    if uploaded_file.name.endswith('.csv'):
         df = pd.read_csv(uploaded_file, header=header_row)
     else:
-        df = pd.read_excel(uploaded_file)
+        df = pd.read_excel(uploaded_file, header=header_row)
+        
     df.columns = df.columns.astype(str).str.strip()
 except Exception as e:
     st.error(f"파일을 읽는 중 오류가 발생했습니다: {e}")
@@ -58,11 +65,14 @@ try:
     kg_col = find_col(['order kg', 'kg', '중량'])
     df['__KG_NUM'] = pd.to_numeric(df[kg_col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0) if (kg_col and kg_col in df.columns) else 0
 
+    # 날짜 데이터 뒤의 00:00:00 깔끔하게 제거하는 함수
     def format_df_dates(input_df):
         d_df = input_df.copy()
-        if date_col and date_col in d_df.columns:
-            d_df[date_col] = pd.to_datetime(d_df[date_col], errors='coerce').dt.strftime('%Y-%m-%d').fillna('')
-            d_df[date_col] = d_df[date_col].replace('NaT', '')
+        for col in d_df.columns:
+            # 컬럼 이름에 '날기', '납기', '일자', 'Date', 'Delivery' 등이 들어가거나 데이터 타입이 날짜인 경우
+            if any(k in col for k in ['납기', '일자', '날짜', 'Date', 'DELIVERY', '수령']):
+                d_df[col] = pd.to_datetime(d_df[col], errors='coerce').dt.strftime('%Y-%m-%d').fillna(d_df[col].astype(str))
+                d_df[col] = d_df[col].replace(['NaT', 'nan', 'NaT 00:00:00'], '')
         return d_df
 
     st.sidebar.markdown("---")
@@ -93,14 +103,15 @@ try:
                 cond = cond | filtered_df[product_col].astype(str).str.contains(search_query, na=False, case=False)
             filtered_df = filtered_df[cond]
 
+        # 폭, 중량, 단가 등 모든 컬럼이 포함된 전체 데이터프레임을 날짜 포맷만 깔끔하게 다듬어서 출력
         st.data_editor(format_df_dates(filtered_df), width='stretch')
 
     elif menu == "📅 캘린더":
         st.subheader("Shipment Calendar")
         if date_col in df.columns:
             valid_df = df.dropna(subset=[date_col]).copy()
-            valid_df['YearMonth'] = valid_df[date_col].dt.to_period('M').astype(str)
-            ym_list = sorted(valid_df['YearMonth'].unique(), reverse=True)
+            valid_df['YearMonth'] = pd.to_datetime(valid_df[date_col], errors='coerce').dt.to_period('M').astype(str)
+            ym_list = sorted([ym for ym in valid_df['YearMonth'].unique() if ym != 'NaT'], reverse=True)
             if ym_list:
                 selected_ym = st.selectbox("Select Year-Month", ym_list)
                 st.dataframe(format_df_dates(valid_df[valid_df['YearMonth'] == selected_ym]), width='stretch')
