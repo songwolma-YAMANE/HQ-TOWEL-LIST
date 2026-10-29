@@ -12,7 +12,7 @@ st.markdown("구글 스프레드시트와 실시간 연동된 SCM 대시보드�
 
 # 새로 발급받은 구글 앱스 스크립트 웹 앱 URL 적용
 web_app_url = (
-    "https://script.google.com/macros/s/AKfycbx_IS5g4LRnR3lxxNr6siN5Kgml9y6EahmN8vg2tXX4qte7QLR3AJfAAqPtX_Sr77j9/exec"
+    "https://script.google.com/macros/s/AKfycbzOEI1bBuSYXtf5MrbnmQ4J4pQwdJy7yvomVRYAdvjdgG2nujsMTyTP--DWkb0oFG5x/exec"
 )
 
 # 데이터 로딩 상태 표시
@@ -39,18 +39,3 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         filtered_df = df[
             df.astype(str)
             .apply(lambda row: row.str.contains(search_keyword, case=False))
-            .any(axis=1)
-        ]
-        st.dataframe(filtered_df, use_container_width=True)
-        st.info(f"검색 결과: 총 {len(filtered_df)}건")
-      else:
-        # 전체 데이터 표 출력
-        st.dataframe(df, use_container_width=True)
-
-    else:
-      st.warning(
-          "구글 시트에 데이터가 비어있거나 올바른 형식으로 읽어오지 못했습니다."
-      )
-
-  except Exception as e:
-    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
