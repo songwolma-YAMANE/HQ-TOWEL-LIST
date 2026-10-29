@@ -12,7 +12,7 @@ st.markdown("구글 스프레드시트와 실시간 연동된 SCM 대시보드�
 
 # 새로 발급받은 구글 앱스 스크립트 웹 앱 URL 적용
 web_app_url = (
-    "https://script.google.com/macros/s/AKfycbxBe_5wzjZ6XLTyQe1yhY8IhR9duxxDDkw7G-9p1M3BaKvYB96HQtdBerxwwcSK3Fap/exec"
+    "https://script.google.com/macros/s/AKfycbxfVyXU-3ucCBrr84DK4kRiDtrc3GMIhFUc1Iz6odzgDMsl4ZN1dJIdm2WxH5bFsp0/exec"
 )
 
 # 데이터 로딩 상태 표시
@@ -31,14 +31,9 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           f"데이터를 성공적으로 불러왔습니다! (총 {len(df)}행 데이터 로드됨)"
       )
 
-      # 데이터 구조 확인용 (디버깅 영역)
-      with st.expander("데이터 구조 확인하기"):
-        st.write("컬럼 목록:", df.columns.tolist())
-        st.write(df.head(2))
-
-      # 검색 기능 추가 (품명, 출하처 등 검색)
+      # 검색 기능 추가 (대리점, 품명, 출하처 등 검색)
       search_keyword = st.text_input(
-          "🔍 검색어 입력 (품명, 출하처 등 검색)", ""
+          "🔍 검색어 입력 (대리점, 품명, 출하처 등 검색)", ""
       )
 
       if search_keyword:
@@ -50,17 +45,14 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         )
         filtered_df = df[mask]
 
-        st.dataframe(filtered_df, use_container_width=True, height=500)
+        st.dataframe(filtered_df, use_container_width=True, height=600)
         st.info(f"검색 결과: 총 {len(filtered_df)}건")
       else:
         # 전체 데이터 표 출력
-        st.dataframe(df, use_container_width=True, height=500)
+        st.dataframe(df, use_container_width=True, height=600)
 
     else:
-      st.warning(
-          "가져온 데이터가 비어있습니다. 구글 시트의 1행에 컬럼명이 정확히"
-          " 입력되어 있는지 확인해 주세요."
-      )
+      st.warning("가져온 데이터가 비어있습니다. 시트 내용을 확인해 주세요.")
 
   except Exception as e:
     st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
