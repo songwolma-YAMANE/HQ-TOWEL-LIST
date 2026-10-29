@@ -10,9 +10,9 @@ st.set_page_config(
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown("구글 스프레드시트와 실시간 연동된 SCM 대시보드입니다.")
 
-# 구글 앱스 스크립트 웹 앱 URL
+# 새로 발급받은 구글 앱스 스크립트 웹 앱 URL 적용
 web_app_url = (
-    "https://script.google.com/macros/s/AKfycby7hd4SUPt3m-FjjxrV9ehTc0oI_4drlGd8-0YeOx76aVfqa-2a_bIYyqe9_zMLrIYb/exec"
+    "https://script.google.com/macros/s/AKfycbx_IS5g4LRnR3lxxNr6siN5Kgml9y6EahmN8vg2tXX4qte7QLR3AJfAAqPtX_Sr77j9/exec"
 )
 
 # 데이터 로딩 상태 표시
@@ -29,7 +29,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
 
       st.success("데이터를 성공적으로 불러왔습니다!")
 
-      # 검색 기능 추가 (선택사항: 품명이나 출하처 등으로 쉽게 찾을 수 있음)
+      # 검색 기능 추가 (품명, 출하처 등 검색)
       search_keyword = st.text_input(
           "🔍 검색어 입력 (품명, 출하처 등 검색)", ""
       )
