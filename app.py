@@ -10,9 +10,9 @@ st.set_page_config(
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown("구글 스프레드시트와 실시간 연동된 SCM 대시보드입니다.")
 
-# 새로 발급받은 구글 앱스 스크립트 웹 앱 URL 적용
+# 구글 앱스 스크립트 웹 앱 URL 적용
 web_app_url = (
-    "https://script.google.com/macros/s/AKfycbzOEI1bBuSYXtf5MrbnmQ4J4pQwdJy7yvomVRYAdvjdgG2nujsMTyTP--DWkb0oFG5x/exec"
+    "https://script.google.com/macros/s/AKfycbzOEI1bBuSYXtf5MrbnmQ4J4pQwdJZ7yvomVRYAdvjdgG2nujsMTyTP--DWkb0oFG5x/exec"
 )
 
 # 데이터 로딩 상태 표시
@@ -35,7 +35,24 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
       )
 
       if search_keyword:
-        # 데이터프레임 내에서 검색어가 포함된 행만 필터링
-        filtered_df = df[
+        # 괄호와 조건식을 안전하게 수정한 필터링 코드
+        mask = (
             df.astype(str)
             .apply(lambda row: row.str.contains(search_keyword, case=False))
+            .any(axis=1)
+        )
+        filtered_df = df[mask]
+
+        st.dataframe(filtered_df, use_container_width=True)
+        st.info(f"검색 결과: 총 {len(filtered_df)}건")
+      else:
+        # 전체 데이터 표 출력
+        st.dataframe(df, use_container_width=True)
+
+    else:
+      st.warning(
+          "구글 시트에 데이터가 비어있거나 올바른 형식으로 읽어오지 못했습니다."
+      )
+
+  except Exception as e:
+    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
