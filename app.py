@@ -8,11 +8,14 @@ st.set_page_config(
 )
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
-st.markdown("구글 스프레드시트와 실시간 연동된 SCM 대시보드입니다.")
+st.markdown(
+    "구글 스프레드시트와 실시간 연동된 SCM 대시보드입니다. (폭, 중량 및 날짜"
+    " 포맷 최적화)"
+)
 
 # 새로 발급받은 구글 앱스 스크립트 웹 앱 URL 적용
 web_app_url = (
-    "https://script.google.com/macros/s/AKfycbxfVyXU-3ucCBrr84DK4kRiDtrc3GMIhFUc1Iz6odzgDMsl4ZN1dJIdm2WxH5bFsp0/exec"
+    "https://script.google.com/macros/s/AKfycby_4c8lsEFsWt66f8gu9d6q0z1dPUNJ1aLCHF7pz6M5RbjpNeykU2vbXDJZZYLoKKDL/exec"
 )
 
 # 데이터 로딩 상태 표시
