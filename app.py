@@ -10,12 +10,19 @@ st.set_page_config(
 )
 
 # ====================================================
-# 🔐 화면 접속 비밀번호 인증 시스템 (관리자 지정 가능)
+# 🔐 권한별 비밀번호 설정 (요청하신 비밀번호 적용 완료)
 # ====================================================
-ADMIN_PASSWORD = "songwol1234"  # 👈 이 부분을 원하시는 비밀번호로 변경하세요!
+USER_PASSWORD = "songwol1234"  # 직원/공유용 비밀번호
+ADMIN_PASSWORD = "diaksp007099"  # 관리자(본인) 전용 비밀번호
 
 if "authenticated" not in st.session_state:
   st.session_state.authenticated = False
+if "is_admin" not in st.session_state:
+  st.session_state.is_admin = False
+
+# 방문 기록 저장을 위한 세션 상태 초기화
+if "visit_logs" not in st.session_state:
+  st.session_state.visit_logs = []
 
 if not st.session_state.authenticated:
   st.markdown(
@@ -29,12 +36,39 @@ if not st.session_state.authenticated:
     )
     if st.button("로그인", use_container_width=True):
       if password_input == ADMIN_PASSWORD:
+        # 관리자 비밀번호로 로그인한 경우
         st.session_state.authenticated = True
+        st.session_state.is_admin = True
+
+        # 방문 기록 추가
+        now_time = datetime.now()
+        st.session_state.visit_logs.append({
+            "접속시간": now_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "날짜": now_time.strftime("%Y-%m-%d"),
+            "권한": "관리자",
+        })
+
+        st.success("관리자 권한으로 인증되었습니다!")
+        st.rerun()
+
+      elif password_input == USER_PASSWORD:
+        # 일반 사용자 비밀번호로 로그인한 경우
+        st.session_state.authenticated = True
+        st.session_state.is_admin = False
+
+        # 방문 기록 추가
+        now_time = datetime.now()
+        st.session_state.visit_logs.append({
+            "접속시간": now_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "날짜": now_time.strftime("%Y-%m-%d"),
+            "권한": "일반 사용자",
+        })
+
         st.success("인증되었습니다!")
         st.rerun()
       else:
         st.error("비밀번호가 틀렸습니다.")
-  st.stop()  # 인증되기 전에는 아래 대시보드가 보이지 않도록 차단
+  st.stop()
 
 
 # 로컬 이미지 파일을 Base64로 변환하여 HTML에서 깨지지 않도록 처리하는 함수
@@ -47,7 +81,7 @@ def get_base64_image(image_path):
     return ""
 
 
-# 이미지 파일들을 Base64로 인코딩 (파이썬 파일과 같은 경로에 파일이 있어야 합니다)
+# 이미지 파일들을 Base64로 인코딩
 img_korea_base64 = get_base64_image("logo_korea.png")
 img_vina_base64 = get_base64_image("logo_vina.png")
 
@@ -93,11 +127,14 @@ def load_data(url):
   return response.json()
 
 
-# 사이드바 설정 (메뉴 네비게이션 및 새로고침)
+# 사이드바 설정 (관리자 여부에 따라 메뉴 다르게 표시)
 st.sidebar.title("🗂️ 메뉴 네비게이션")
-menu_choice = st.sidebar.radio(
-    "이동할 메뉴:", ["📦 메인 SCM 대시보드", "📊 SCM 통계 분석 그래프"]
-)
+
+menu_options = ["📦 메인 SCM 대시보드", "📊 SCM 통계 분석 그래프"]
+if st.session_state.is_admin:
+  menu_options.append("🔒 관리자 전용 방문자 통계")  # 관리자에게만 메뉴 추가
+
+menu_choice = st.sidebar.radio("이동할 메뉴:", menu_options)
 
 st.sidebar.markdown("---")
 if st.sidebar.button("🔄 데이터 새로고침", use_container_width=True):
@@ -170,7 +207,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
       ]
       display_df = df.drop(columns=cols_to_drop, errors="ignore")
 
-      # 공통으로 쓰일 컬럼명 정의 (실사종은 PILE 또는 YARN 우선 매칭)
+      # 공통으로 쓰일 컬럼명 정의
       name_col = [c for c in df.columns if "제품명" in c or "KOREAN NAME" in c]
       width_col = [c for c in df.columns if "폭" in c or "width" in c.lower()]
       item_col = [c for c in df.columns if "PILE" in c or "YARN" in c]
@@ -392,7 +429,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
 
       # ====================================================
-      # [메뉴 2] SCM 통계 분석 그래프 (조건별 상세 분석 대폭 강화)
+      # [메뉴 2] SCM 통계 분석 그래프
       # ====================================================
       elif menu_choice == "📊 SCM 통계 분석 그래프":
         st.markdown("---")
@@ -402,7 +439,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             " 건수**가 즉시 분석됩니다."
         )
 
-        # 다중 조건 검색 필터 박스 생성
         with st.expander(
             "🎯 분석 조건 상세 설정 (클릭하여 열기/닫기)", expanded=True
         ):
@@ -432,7 +468,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 key="stat_year",
             )
 
-        # 조건 필터링 적용
         stat_idx = df.index
         if stat_agency and stat_agency != "전체 선택":
           m = (
@@ -467,7 +502,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             display_df.index.intersection(stat_idx)
         ]
 
-        # 📌 핵심 요약 건수 강조 멧트릭 카드
         st.markdown("---")
         f_total = len(filtered_stat_df)
         f_completed = len(
@@ -497,9 +531,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         )
         st.markdown("---")
 
-        # 그래프 및 표 시각화 영역
         col_g1, col_g2 = st.columns(2)
-
         with col_g1:
           st.markdown("### 📈 연도별 수주 건수 분석")
           if not filtered_stat_df.empty:
@@ -527,6 +559,42 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         st.markdown("---")
         st.subheader("📋 조건별 상세 검색 결과 목록")
         st.dataframe(filtered_display_df, use_container_width=True, height=400)
+
+      # ====================================================
+      # [메뉴 3] 관리자 전용 방문자 통계 (관리자만 접근 가능)
+      # ====================================================
+      elif menu_choice == "🔒 관리자 전용 방문자 통계":
+        if st.session_state.is_admin:
+          st.markdown("---")
+          st.subheader("🔒 관리자 전용 시스템 접속 및 방문자 통계")
+          st.markdown("이 메뉴는 관리자 계정으로 로그인한 경우에만 표시됩니다.")
+
+          logs = st.session_state.visit_logs
+          total_visits = len(logs)
+          today_str = datetime.now().strftime("%Y-%m-%d")
+          today_visits = sum(1 for log in logs if log["날짜"] == today_str)
+
+          v_col1, v_col2 = st.columns(2)
+          v_col1.metric(
+              label="📅 오늘 총 방문 횟수",
+              value=f"{today_visits} 회",
+              delta="오늘",
+          )
+          v_col2.metric(
+              label="📊 누적 총 방문 횟수",
+              value=f"{total_visits} 회",
+              delta="전체",
+          )
+
+          st.markdown("---")
+          st.subheader("📋 상세 접속 이력 로그")
+          if logs:
+            log_df = pd.DataFrame(logs)
+            st.dataframe(log_df, use_container_width=True, height=350)
+          else:
+            st.info("기록된 방문 로그가 없습니다.")
+        else:
+          st.warning("접근 권한이 없습니다.")
 
   except Exception as e:
     st.error(f"데이터를 불러오거나 처리하는 중 오류가 발생했습니다: {e}")
