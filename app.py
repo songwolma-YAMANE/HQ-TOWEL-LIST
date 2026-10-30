@@ -85,7 +85,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         if data and len(data) > 0:
             df = pd.DataFrame(data)
 
-            # 1. 통화 포맷 적용 ($)
+            # 1. 통화 포맷 적용 ($) - 소수점 넷째 자리(:,.4f)까지 표시되도록 수정
             for col in df.columns:
                 if (
                     "단가" in col
@@ -102,7 +102,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                         errors="coerce",
                     )
                     df[col] = df[col].apply(
-                        lambda x: f"$ {x:,.2f}"
+                        lambda x: f"$ {x:,.4f}"
                         if pd.notnull(x) and x > 0
                         else ""
                     )
@@ -313,143 +313,4 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                             month_idx = uncompleted_df_raw[
                                 uncompleted_df_raw["출고월"] == selected_month
                             ].index
-                            month_df = display_df.loc[
-                                display_df.index.intersection(month_idx)
-                            ]
-                            st.info(
-                                f"📌 [{selected_month}] 출고 예정 미출고 제품: 총"
-                                f" **{len(month_df)}건**"
-                            )
-                            st.dataframe(month_df, use_container_width=True)
-                        else:
-                            st.info("예정된 월별 미출고 데이터가 없습니다.")
-                    else:
-                        st.success(
-                            "🎉 현재 모든 오더의 출고가 완료되어 미출고 건이"
-                            " 없습니다!"
-                        )
-                else:
-                    st.info("월별 출고 예정 데이터를 불러올 수 없습니다.")
-
-                # 4. 메인 상세 조건 검색 (정확한 일치 비교로 수정 완료)
-                st.markdown("---")
-                st.subheader(
-                    "🔍 상세 조건 검색 (원하는 단어를 선택하거나 검색하세요)"
-                )
-
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    sel_name = st.selectbox(
-                        "🏷️ 제품명 선택/검색",
-                        ["전체 선택"] + all_names,
-                        key="main_name",
-                    )
-                with c2:
-                    sel_width = st.selectbox(
-                        "📏 폭 사이즈 선택/검색",
-                        ["전체 선택"] + all_widths,
-                        key="main_width",
-                    )
-                with c3:
-                    sel_item = st.selectbox(
-                        "🔖 실사종 / ITEM 선택/검색",
-                        ["전체 선택"] + all_items,
-                        key="main_item",
-                    )
-
-                search_idx = df.index
-                if sel_name and sel_name != "전체 선택":
-                    match_mask = (
-                        df[name_col[0]].astype(str).str.strip()
-                        == str(sel_name).strip()
-                    )
-                    search_idx = search_idx.intersection(
-                        df[match_mask].index
-                    )
-                if sel_width and sel_width != "전체 선택":
-                    match_mask = (
-                        df[width_col[0]].astype(str).str.strip()
-                        == str(sel_width).strip()
-                    )
-                    search_idx = search_idx.intersection(
-                        df[match_mask].index
-                    )
-                if sel_item and sel_item != "전체 선택":
-                    match_mask = (
-                        df[item_col[0]].astype(str).str.strip()
-                        == str(sel_item).strip()
-                    )
-                    search_idx = search_idx.intersection(
-                        df[match_mask].index
-                    )
-
-                search_df = display_df.loc[
-                    display_df.index.intersection(search_idx)
-                ]
-
-                st.write(f"검색 결과: 총 **{len(search_df)}건**")
-                st.dataframe(search_df, use_container_width=True, height=500)
-
-                # 5. 과거 오더 건수 폴더형식 아카이브
-                st.markdown("---")
-                st.subheader("📁 과거 오더 건수 아카이브 (연도별 폴더)")
-                past_years = [y for y in years if y < latest_year]
-
-                if past_years:
-                    folder_tabs = st.tabs(
-                        [str(py) + "년도 오더 폴더" for py in past_years]
-                    )
-                    for idx, py in enumerate(past_years):
-                        py_val = past_years[idx]
-                        with folder_tabs[idx]:
-                            p_idx = df[df["연도"] == py_val].index
-                            p_df = display_df.loc[
-                                display_df.index.intersection(p_idx)
-                            ]
-                            st.info(
-                                f"📂 {py_val}년도 과거 오더 내역 (총"
-                                f" {len(p_df)}건 출고 완료 데이터)"
-                            )
-                            st.dataframe(
-                                p_df, use_container_width=True, height=400
-                            )
-                else:
-                    st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
-
-            # ====================================================
-            # [메뉴 2] SCM 통계 분석 그래프
-            # ====================================================
-            elif menu_choice == "📊 SCM 통계 분석 그래프":
-                st.markdown("---")
-                st.subheader("📊 연도별 및 상태별 SCM 통계 분석")
-
-                yearly_counts = df["연도"].value_counts().reset_index()
-                yearly_counts.columns = ["연도", "오더 건수"]
-                yearly_counts = yearly_counts.sort_values("연도")
-
-                col_stat1, col_stat2 = st.columns(2)
-
-                with col_stat1:
-                    st.markdown("### 📈 연도별 수주 건수 추이")
-                    if not yearly_counts.empty:
-                        st.bar_chart(
-                            yearly_counts.set_index("연도"), color="#ff6b6b"
-                        )
-                    else:
-                        st.info("표시할 연도별 데이터가 없습니다.")
-
-                with col_stat2:
-                    st.markdown("### 🏷️ 주요 대리점별 오더 비중")
-                    if agency_col:
-                        agency_counts = (
-                            df[agency_col[0]].value_counts().reset_index()
-                        )
-                        agency_counts.columns = ["대리점명", "건수"]
-                        st.dataframe(
-                            agency_counts, use_container_width=True, height=250
-                        )
-                    else:
-                        st.info("대리점 컬럼을 찾을 수 없습니다.")
-
-    except Exception as e:
-        st.error(f"데이터를 불러오거나 처리하는 중 오류가 발생했습니다: {e}")
+                            month_df = display_df.loc
