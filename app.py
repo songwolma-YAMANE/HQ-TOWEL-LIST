@@ -107,7 +107,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                         else ""
                     )
 
-            # 날짜 데이터 정제 (변경하신 '납기 1차' 또는 기존 키워드 자동 인식)
+            # 날짜 데이터 정제 ('납기 1차' 또는 기존 키워드 자동 인식)
             if "발주서 수령" in df.columns:
                 df["발주서 수령_dt"] = pd.to_datetime(
                     df["발주서 수령"], errors="coerce"
@@ -137,11 +137,15 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 by="발주서 수령_dt", ascending=False
             ).reset_index(drop=True)
 
-            # 불필요한 시스템 컬럼 제거 (4차, 5차 등 필요시 조정)
+            # 🛑 불필요한 시스템 컬럼 및 4차, 5차(납기 5차 등) 컬럼 숨기기/제거
             cols_to_drop = [
                 c
                 for c in df.columns
-                if c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
+                if "4차" in c
+                or "5차" in c
+                or "DELIVERY 4" in c
+                or "DELIVERY 5" in c
+                or c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
             ]
             display_df = df.drop(columns=cols_to_drop, errors="ignore")
 
