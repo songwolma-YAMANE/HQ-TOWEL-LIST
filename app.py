@@ -9,40 +9,17 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🏢 상단 회사 로고 나란히 배치 (크기 균형 맞춤)
+# 🏢 상단 브랜드 로고/배너 디자인 적용
 # ----------------------------------------------------
 st.markdown(
     """
-    <style>
-    .logo-container {
-        display: flex;
-        align-items: center;
-        gap: 25px;
-        margin-bottom: 10px;
-    }
-    .logo-container img {
-        height: 38px; /* 두 로고의 높이를 동일하게 맞춰 시각적 균형 유지 */
-        object-fit: contain;
-    }
-    </style>
-    <div class="logo-container">
-        <img src="app/static/logo_korea.png" alt="SONGWOL KOREA">
-        <img src="app/static/logo_vina.png" alt="SONGWOL VINA">
+    <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+        <span style="background-color: #7b1113; color: white; padding: 6px 14px; border-radius: 4px; font-weight: bold; font-size: 14px; letter-spacing: 1px;">SONGWOL KOREA</span>
+        <span style="background-color: #5a1827; color: white; padding: 6px 14px; border-radius: 4px; font-weight: bold; font-size: 14px; letter-spacing: 1px;">SONGWOL VINA</span>
     </div>
 """,
     unsafe_allow_html=True,
 )
-
-# 만약 위 경로로 로드가 안 될 경우를 대비해 st.image를 나란히 사용하는 방식도 지원합니다.
-# (로고 이미지 파일을 app.py와 같은 폴더에 'logo_korea.png', 'logo_vina.png'로 저장해주세요)
-try:
-  col_l1, col_l2, col_l3 = st.columns([1.5, 1.5, 7])
-  with col_l1:
-    st.image("logo_korea.png", width=180)
-  with col_l2:
-    st.image("logo_vina.png", width=190)
-except Exception:
-  pass
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
