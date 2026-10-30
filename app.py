@@ -339,7 +339,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("납기일 데이터를 확인할 수 없습니다.")
 
-        # 2. ✨ [신규] 최근 7일 이내 추가된 신규 오더 리스트 (요청하신 위치)
+        # 2. ✨ [신규] 최근 7일 이내 추가된 신규 오더 리스트
         st.markdown("---")
         st.subheader("✨ [신규] 최근 7일 이내 추가된 오더 리스트")
 
@@ -472,7 +472,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
 
       # ====================================================
-      # [메뉴 2] SCM 통계 분석 그래프
+      # [메뉴 2] SCM 통계 분석 그래프 (분석 설명문 추가 완료)
       # ====================================================
       elif menu_choice == "📊 SCM 통계 분석 그래프":
         st.markdown("---")
@@ -574,9 +574,12 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         )
         st.markdown("---")
 
+        # 그래프 및 전문 분석 설명문 영역
         col_g1, col_g2 = st.columns(2)
+
+        # 1. 연도별 분석 및 자동 인사이트 생성
         with col_g1:
-          st.markdown("### 📈 연도별 수주 건수 분석")
+          st.markdown("### 📈 연도별 수수(수주) 건수 분석")
           if not filtered_stat_df.empty:
             y_trend = (
                 filtered_stat_df["연도"].dropna().value_counts().reset_index()
@@ -584,9 +587,41 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             y_trend.columns = ["연도", "건수"]
             y_trend = y_trend.sort_values("연도")
             st.bar_chart(y_trend.set_index("연도"), color="#3b82f6")
+
+            # 💡 연도별 전문 분석 설명 생성
+            if len(y_trend) >= 2:
+              latest_row = y_trend.iloc[-1]
+              prev_row = y_trend.iloc[-2]
+              cur_year = latest_row["연도"]
+              cur_cnt = latest_row["건수"]
+              prev_year = prev_row["연도"]
+              prev_cnt = prev_row["건수"]
+
+              if prev_cnt > 0:
+                diff_pct = ((cur_cnt - prev_cnt) / prev_cnt) * 100
+                direction = "증가" if diff_pct >= 0 else "감소"
+                st.info(
+                    f"💡 **[연도별 SCM 인사이트]**\n\n- 직전 연도인"
+                    f" **{prev_year}년({prev_cnt}건)** 대비 **{cur_year}년작년/현재주문"
+                    f" ({cur_cnt}건)** 기준 수주량이 **{abs(diff_pct):.1f}%"
+                    f" {direction}** 추세를 보이고 있습니다.\n- 전체 오더"
+                    f" 물량의 변동성을 파악하여 생산 라인 및 원부자재 수급"
+                    f" 계획에 참고하시기 바랍니다."
+                )
+              else:
+                st.info(
+                    f"💡 **[연도별 SCM 인사이트]**\n\n- {cur_year}년 총 수주"
+                    f" 건수는 **{cur_cnt}건**으로 집계되었습니다."
+                )
+            else:
+              st.info(
+                  "💡 비교할 수 있는 이전 연도 데이터가 부족하거나 단일 연도"
+                  " 페이즈입니다."
+              )
           else:
             st.info("조건에 해당하는 연도별 데이터가 없습니다.")
 
+        # 2. 월별 분석 및 자동 인사이트 생성
         with col_g2:
           st.markdown("### 📅 월별 수주 추이 분석")
           if not filtered_stat_df.empty:
@@ -596,6 +631,23 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             m_trend.columns = ["발주월", "건수"]
             m_trend = m_trend.sort_values("발주월")
             st.bar_chart(m_trend.set_index("발주월"), color="#10b981")
+
+            # 💡 월별 전문 분석 설명 생성
+            if not m_trend.empty:
+              max_month_row = m_trend.loc[m_trend["건수"].idxmax()]
+              peak_month = max_month_row["발주월"]
+              peak_cnt = max_month_row["건수"]
+              avg_cnt = m_trend["건수"].mean()
+
+              st.info(
+                  f"💡 **[월별 SCM 인사이트]**\n\n- 분석 기간 중 가장 수주가"
+                  f" 집중된 피크(Peak) 시기는 **{peak_month}**이며, 총"
+                  f" **{peak_cnt}건**의 오더가 집중되었습니다.\n- 월평균"
+                  f" 수주량(약 {avg_cnt:.1f}건)과 비교하여 특정 시즌별 물량"
+                  f" 쏠림 현상을 분석하고 공정 부하를 조절하는 데 활용하세요."
+              )
+            else:
+              st.info("월별 트렌드를 분석할 데이터가 부족합니다.")
           else:
             st.info("조건에 해당하는 월별 데이터가 없습니다.")
 
@@ -604,7 +656,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         st.dataframe(filtered_display_df, use_container_width=True, height=400)
 
       # ====================================================
-      # [메뉴 3] 관리자 전용 방문자 통계 및 분석 (관리자만 접근 가능)
+      # [메뉴 3] 관리자 전용 방문자 통계 및 분석
       # ====================================================
       elif menu_choice == "🔒 관리자 전용 방문자 통계":
         if st.session_state.is_admin:
@@ -620,7 +672,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           today_str = datetime.now().strftime("%Y-%m-%d")
           today_visits = sum(1 for log in logs if log["날짜"] == today_str)
 
-          # 요약 메트릭 카드
           v_col1, v_col2 = st.columns(2)
           v_col1.metric(
               label="📅 오늘 총 방문(새로고침) 횟수",
@@ -635,7 +686,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
 
           st.markdown("---")
 
-          # 방문 통계 분석 그래프 영역
           if logs:
             log_df = pd.DataFrame(logs)
 
