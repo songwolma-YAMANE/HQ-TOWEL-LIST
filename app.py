@@ -10,7 +10,8 @@ st.set_page_config(
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
-    "구글 스프레드시트 실시간 연동 SCM 대시보드 (컬럼 최적화 및 불필요한 열 숨김)"
+    "구글 스프레드시트 실시간 연동 SCM 대시보드 (미출고 기준 월별 출고 예정"
+    " 관리)"
 )
 
 # 구글 앱스 스크립트 웹 앱 URL 입력
@@ -90,7 +91,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           drop=True
       )
 
-      # 💡 4차, 5차 확정납기 및 오른쪽에 생성되던 불필요한 시스템 컬럼(중복 날짜 등) 제거
+      # 4차, 5차 확정납기 및 불필요한 시스템 컬럼 제거
       cols_to_drop = [
           c
           for c in df.columns
@@ -109,7 +110,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
 
         # 1. 2026년(최근 연도) 핵심 요약 카드
         st.markdown("---")
-        # 원본 df에서 연도 계산용 데이터 활용
         latest_df_raw = df[df["연도"] == latest_year]
         total_ordered = len(latest_df_raw)
         completed_count = len(
@@ -154,8 +154,8 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
 
           if not imminent_df.empty:
             st.error(
-                f"⚠️ 향후 7일 이내 출고 예정된 건이 총 **{len(imminent_df)}건**"
-                " 있습니다!"
+                f"⚠️ 향후 7일 이내 출고 예정된 미출고 건이 총"
+                f" **{len(imminent_df)}건** 있습니다!"
             )
             st.dataframe(
                 imminent_df,
@@ -183,52 +183,68 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("납기일 데이터를 확인할 수 없습니다.")
 
-        # 3. 월별 출고 예정 현황
+        # 3. 월별 출고 예정 현황 (💡 미출고 건만 대상으로 필터링 적용)
         st.markdown("---")
-        st.subheader("📅 월별 출고 예정 제품 리스트 및 건수")
+        st.subheader("📅 월별 출고 예정 제품 리스트 및 건수 (미출고 기준)")
         if delivery_col and not df["납기_dt"].isna().all():
-          temp_df = df.copy()
-          temp_df["출고월"] = temp_df["납기_dt"].dt.strftime("%Y-%m")
-          valid_months = (
-              temp_df[
-                  temp_df["출고월"].notnull() & (temp_df["출고월"] != "NaT")
-              ]
-              .sort_values("출고월", ascending=True)["출고월"]
-              .unique()
-          )
+          # 출고 완료되지 않은(미출고) 데이터만 추출
+          uncompleted_df_raw = df[
+              df["출고 완료"].astype(str).str.upper() != "O"
+          ].copy()
 
-          if len(valid_months) > 0:
-            selected_month = st.selectbox(
-                "출고 예정 월을 선택하세요", valid_months, index=0
+          if not uncompleted_df_raw.empty:
+            uncompleted_df_raw["출고월"] = (
+                uncompleted_df_raw["납기_dt"].dt.strftime("%Y-%m")
             )
-            month_idx = temp_df[temp_df["출고월"] == selected_month].index
-            month_df = display_df.loc[
-                display_df.index.intersection(month_idx)
-            ]
-            st.info(
-                f"📌 [{selected_month}] 출고 예정 제품: 총"
-                f" **{len(month_df)}건**"
+            valid_months = (
+                uncompleted_df_raw[
+                    uncompleted_df_raw["출고월"].notnull()
+                    & (uncompleted_df_raw["출고월"] != "NaT")
+                ]
+                .sort_values("출고월", ascending=True)["출고월"]
+                .unique()
             )
-            st.dataframe(
-                month_df,
-                use_container_width=True,
-                column_config={
-                    "발주서 수령": st.column_config.TextColumn(
-                        "발주서 수령", width="small"
-                    ),
-                    "확정납기 1차 (DELIVERY 1)": st.column_config.TextColumn(
-                        "확정납기 1차", width="small"
-                    ),
-                    "확정납기 2차 (DELIVERY 2)": st.column_config.TextColumn(
-                        "확정납기 2차", width="small"
-                    ),
-                    "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
-                        "확정납기 3차", width="small"
-                    ),
-                    "출고 완료": st.column_config.TextColumn(
+
+            if len(valid_months) > 0:
+              selected_month = st.selectbox(
+                  "출고 예정 월을 선택하세요", valid_months, index=0
+              )
+              month_idx = uncompleted_df_raw[
+                  uncompleted_df_raw["출고월"] == selected_month
+              ].index
+              month_df = display_df.loc[
+                  display_df.index.intersection(month_idx)
+              ]
+              st.info(
+                  f"📌 [{selected_month}] 출고 예정 미출고 제품: 총"
+                  f" **{len(month_df)}건**"
+              )
+              st.dataframe(
+                  month_df,
+                  use_container_width=True,
+                  column_config={
+                      "발주서 수령": st.column_config.TextColumn(
+                          "발주서 수령", width="small"
+                      ),
+                      "확정납기 1차 (DELIVERY 1)": st.column_config.TextColumn(
+                          "확정납기 1차", width="small"
+                      ),
+                      "확정납기 2차 (DELIVERY 2)": st.column_config.TextColumn(
+                          "확정납기 2차", width="small"
+                      ),
+                      "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
+                          "확정납기 3차", width="small"
+                      ),
+                      "출고 완료": st.column_config.TextColumn(
                         "출고 완료", width="small"
                     ),
-                },
+                  },
+              )
+            else:
+              st.info("예정된 월별 미출고 데이터가 없습니다.")
+          else:
+            st.success(
+                "🎉 현재 모든 오더의 출고가 완료되어 미출고 건이 없습니다!"
             )
         else:
           st.info("월별 출고 예정 데이터를 불러올 수 없습니다.")
@@ -244,7 +260,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         with c3:
           q_item = st.text_input("🔖 실사종 / ITEM", "")
 
-        # 검색은 원본 df에서 필터링 후 display_df의 인덱스로 매칭
         search_idx = df.index
         if q_name:
           match_mask = (
@@ -279,7 +294,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         search_df = display_df.loc[display_df.index.intersection(search_idx)]
 
         st.write(f"검색 결과: 총 **{len(search_df)}건**")
-        # 💡 확정납기 1차, 2차, 3차 모두 동일하게 컴팩트한 small 사이즈로 설정
         st.dataframe(
             search_df,
             use_container_width=True,
