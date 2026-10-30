@@ -150,7 +150,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             ]
             display_df = df.drop(columns=cols_to_drop, errors="ignore")
 
-            # 공통으로 쓰일 컬럼명 정의
+            # 공통으로 쓰일 컬럼명 정의 (실사종은 PILE 또는 YARN 우선 매칭)
             name_col = [
                 c for c in df.columns if "제품명" in c or "KOREAN NAME" in c
             ]
@@ -158,13 +158,8 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 c for c in df.columns if "폭" in c or "width" in c.lower()
             ]
             item_col = [
-                c
-                for c in df.columns
-                if "ITEM" in c
-                or "아이템" in c
-                or "PILE" in c
-                or "YARN" in c
-            ]
+                c for c in df.columns if "PILE" in c or "YARN" in c
+            ]  # 👈 실사종(PILE/YARN) 매칭 수정
             agency_col = [
                 c for c in df.columns if "대리점" in c or "AGENCY" in c
             ]
@@ -352,7 +347,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                     )
                 with c3:
                     sel_item = st.selectbox(
-                        "🔖 실사종 / ITEM 선택/검색",
+                        "🔖 파일사종 선택/검색",
                         ["전체 선택"] + all_items,
                         key="main_item",
                     )
@@ -452,7 +447,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                         )
                     with sc4:
                         stat_item = st.selectbox(
-                            "🔖 실사종 / ITEM",
+                            "🔖 파일사종 (PILE/YARN)",
                             ["전체 선택"] + all_items,
                             key="stat_item",
                         )
