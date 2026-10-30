@@ -9,34 +9,19 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🏢 상단 회사 오리지널 로고 나란히 배치 (비율 및 높이 균형 최적화)
+# 🏢 상단 오리지널 로고 직접 나란히 배치 (크기 균형 맞춤)
 # ----------------------------------------------------
-logo_korea_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="  # (플레이스홀더)
-logo_vina_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-
-st.markdown(
-    """
-    <style>
-    .brand-logo-container {
-        display: flex;
-        align-items: center;
-        gap: 30px;
-        margin-bottom: 15px;
-        padding-top: 5px;
-    }
-    .brand-logo-container img {
-        height: 42px; /* 두 로고의 시각적 높이를 동일하게 맞춤 */
-        object-fit: contain;
-    }
-    </style>
-    <div class="brand-logo-container">
-        <!-- 보내주신 오리지널 로고의 웹 호스팅/Base64 적용 -->
-        <img src="https://i.ibb.co/3m3v3g0/songwol-korea-logo.png" alt="SONGWOL KOREA" onerror="this.onerror=null; this.src='https://via.placeholder.com/180x42.png?text=SONGWOL+KOREA';">
-        <img src="https://i.ibb.co/6y4g8Qp/songwol-vina-logo.png" alt="SONGWOL VINA" onerror="this.onerror=null; this.src='https://via.placeholder.com/210x42.png?text=SONGWOL+VINA';">
-    </div>
-""",
-    unsafe_allow_html=True,
-)
+try:
+  logo_col1, logo_col2, _ = st.columns([1.5, 1.5, 7])
+  with logo_col1:
+    st.image("logo_korea.png", width=180)
+  with logo_col2:
+    st.image("logo_vina.png", width=210)
+except Exception:
+  st.warning(
+      "⚠️ 'logo_korea.png' 또는 'logo_vina.png' 이미지 파일을 앱 폴더에"
+      " 넣어주세요."
+  )
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
@@ -321,14 +306,14 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                           "확정납기 1차", width="small"
                       ),
                       "확정납기 2차 (DELIVERY 2)": st.column_config.TextColumn(
-                        "확정납기 2차", width="small"
-                    ),
-                    "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
-                        "확정납기 3차", width="small"
-                    ),
-                    "출고 완료": st.column_config.TextColumn(
-                        "출고 완료", width="small"
-                    ),
+                          "확정납기 2차", width="small"
+                      ),
+                      "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
+                          "확정납기 3차", width="small"
+                      ),
+                      "출고 완료": st.column_config.TextColumn(
+                          "출고 완료", width="small"
+                      ),
                   },
               )
             else:
@@ -530,55 +515,3 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
               sc_m1, sc_m2 = st.columns([1, 2])
               with sc_m1:
                 st.dataframe(
-                    m_counts.set_index("월"),
-                    use_container_width=True,
-                    height=250,
-                )
-              with sc_m2:
-                st.bar_chart(m_counts.set_index("월"))
-            else:
-              st.warning("조건에 해당하는 데이터가 없습니다.")
-
-        with g2:
-          st.markdown("#### 🏢 대리점별 발주 비중 Top 10 (필터 반영)")
-          if agency_col:
-            ag_counts = (
-                stat_df[agency_col[0]].value_counts().head(10).reset_index()
-            )
-            ag_counts.columns = ["대리점", "발주건수"]
-            if not ag_counts.empty:
-              sc_a1, sc_a2 = st.columns([1, 2])
-              with sc_a1:
-                st.dataframe(
-                    ag_counts.set_index("대리점"),
-                    use_container_width=True,
-                    height=250,
-                )
-              with sc_a2:
-                st.bar_chart(ag_counts.set_index("대리점"))
-            else:
-              st.warning("조건에 해당하는 데이터가 없습니다.")
-
-        st.markdown("---")
-        st.markdown("#### 📦 출고 완료 vs 미출고 현황 비율 (필터 반영)")
-        if "출고 완료" in stat_df.columns:
-          status_counts = (
-              stat_df["출고 완료"].fillna("진행중").value_counts().reset_index()
-          )
-          status_counts.columns = ["상태", "건수"]
-          if not status_counts.empty:
-            sc_s1, sc_s2 = st.columns([1, 2])
-            with sc_s1:
-              st.dataframe(
-                  status_counts.set_index("상태"), use_container_width=True
-              )
-            with sc_s2:
-              st.bar_chart(status_counts.set_index("상태"))
-          else:
-            st.warning("조건에 해당하는 데이터가 없습니다.")
-
-    else:
-      st.warning("가져온 데이터가 비어있습니다. 시트 내용을 확인해 주세요.")
-
-  except Exception as e:
-    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
