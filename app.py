@@ -9,19 +9,30 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🏢 상단 오리지널 로고 직접 나란히 배치 (크기 균형 맞춤)
+# 🏢 상단 오리지널 로고 나란히 배치 및 정렬(ALIGN) 최적화
 # ----------------------------------------------------
-try:
-  logo_col1, logo_col2, _ = st.columns([1.5, 1.5, 7])
-  with logo_col1:
-    st.image("logo_korea.png", width=180)
-  with logo_col2:
-    st.image("logo_vina.png", width=210)
-except Exception:
-  st.warning(
-      "⚠️ 'logo_korea.png' 또는 'logo_vina.png' 이미지 파일을 앱 폴더에"
-      " 넣어주세요."
-  )
+st.markdown(
+    """
+    <style>
+    .brand-logo-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        margin-bottom: 12px;
+        padding-top: 5px;
+    }
+    .brand-logo-wrapper img {
+        height: 38px; /* 두 로고의 높이를 완전히 똑같이 고정하여 균형 맞춤 */
+        object-fit: contain;
+    }
+    </style>
+    <div class="brand-logo-wrapper">
+        <img src="logo_korea.png" alt="SONGWOL KOREA">
+        <img src="logo_vina.png" alt="SONGWOL VINA">
+    </div>
+""",
+    unsafe_allow_html=True,
+)
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
@@ -309,11 +320,11 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                           "확정납기 2차", width="small"
                       ),
                       "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
-                        "확정납기 3차", width="small"
-                    ),
-                    "출고 완료": st.column_config.TextColumn(
-                        "출고 완료", width="small"
-                    ),
+                          "확정납기 3차", width="small"
+                      ),
+                      "출고 완료": st.column_config.TextColumn(
+                          "출고 완료", width="small"
+                      ),
                   },
               )
             else:
@@ -555,15 +566,4 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             sc_s1, sc_s2 = st.columns([1, 2])
             with sc_s1:
               st.dataframe(
-                  status_counts.set_index("상태"), use_container_width=True
-              )
-            with sc_s2:
-              st.bar_chart(status_counts.set_index("상태"))
-          else:
-            st.warning("조건에 해당하는 데이터가 없습니다.")
-
-    else:
-      st.warning("가져온 데이터가 비어있습니다. 시트 내용을 확인해 주세요.")
-
-  except Exception as e:
-    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
+                  status
