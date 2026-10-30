@@ -331,7 +331,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 else:
                     st.info("월별 출고 예정 데이터를 불러올 수 없습니다.")
 
-                # 4. 메인 상세 조건 검색
+                # 4. 메인 상세 조건 검색 (정확한 일치 비교로 수정 완료)
                 st.markdown("---")
                 st.subheader(
                     "🔍 상세 조건 검색 (원하는 단어를 선택하거나 검색하세요)"
@@ -360,27 +360,24 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 search_idx = df.index
                 if sel_name and sel_name != "전체 선택":
                     match_mask = (
-                        df[name_col[0]]
-                        .astype(str)
-                        .str.contains(sel_name, na=False)
+                        df[name_col[0]].astype(str).str.strip()
+                        == str(sel_name).strip()
                     )
                     search_idx = search_idx.intersection(
                         df[match_mask].index
                     )
                 if sel_width and sel_width != "전체 선택":
                     match_mask = (
-                        df[width_col[0]]
-                        .astype(str)
-                        .str.contains(sel_width, na=False)
+                        df[width_col[0]].astype(str).str.strip()
+                        == str(sel_width).strip()
                     )
                     search_idx = search_idx.intersection(
                         df[match_mask].index
                     )
                 if sel_item and sel_item != "전체 선택":
                     match_mask = (
-                        df[item_col[0]]
-                        .astype(str)
-                        .str.contains(sel_item, na=False)
+                        df[item_col[0]].astype(str).str.strip()
+                        == str(sel_item).strip()
                     )
                     search_idx = search_idx.intersection(
                         df[match_mask].index
