@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
@@ -8,27 +9,42 @@ st.set_page_config(
     page_title="본사 문직 제품 수주 및 출고 관리 시스템", layout="wide"
 )
 
+
+# 로컬 이미지 파일을 Base64로 변환하여 HTML에서 깨지지 않도록 처리하는 함수
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return ""
+
+
+# 이미지 파일들을 Base64로 인코딩 (파이썬 파일과 같은 경로에 파일이 있어야 합니다)
+img_korea_base64 = get_base64_image("logo_korea.png")
+img_vina_base64 = get_base64_image("logo_vina.png")
+
 # ----------------------------------------------------
 # 🏢 상단 오리지널 로고 나란히 배치 및 정렬(ALIGN) 최적화
 # ----------------------------------------------------
 st.markdown(
-    """
+    f"""
     <style>
-    .brand-logo-wrapper {
+    .brand-logo-wrapper {{
         display: flex;
         align-items: center;
         gap: 25px;
         margin-bottom: 12px;
         padding-top: 5px;
-    }
-    .brand-logo-wrapper img {
+    }}
+    .brand-logo-wrapper img {{
         height: 38px;
         object-fit: contain;
-    }
+    }}
     </style>
     <div class="brand-logo-wrapper">
-        <img src="logo_korea.png" alt="SONGWOL KOREA">
-        <img src="logo_vina.png" alt="SONGWOL VINA">
+        <img src="data:image/png;base64,{img_korea_base64}" alt="SONGWOL KOREA">
+        <img src="data:image/png;base64,{img_vina_base64}" alt="SONGWOL VINA">
     </div>
 """,
     unsafe_allow_html=True,
@@ -377,7 +393,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 st.write(f"검색 결과: 총 **{len(search_df)}건**")
                 st.dataframe(search_df, use_container_width=True, height=500)
 
-                # 5. 과거 오더 건수 폴더형식 아카이브 (완성된 부분)
+                # 5. 과거 오더 건수 폴더형식 아카이브
                 st.markdown("---")
                 st.subheader("📁 과거 오더 건수 아카이브 (연도별 폴더)")
                 past_years = [y for y in years if y < latest_year]
@@ -404,13 +420,12 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                     st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
 
             # ====================================================
-            # [메뉴 2] SCM 통계 분석 그래프 (추가 구현)
+            # [메뉴 2] SCM 통계 분석 그래프
             # ====================================================
             elif menu_choice == "📊 SCM 통계 분석 그래프":
                 st.markdown("---")
                 st.subheader("📊 연도별 및 상태별 SCM 통계 분석")
 
-                # 연도별 오더 총 건수 집계
                 yearly_counts = df["연도"].value_counts().reset_index()
                 yearly_counts.columns = ["연도", "오더 건수"]
                 yearly_counts = yearly_counts.sort_values("연도")
