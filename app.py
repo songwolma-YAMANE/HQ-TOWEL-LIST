@@ -10,8 +10,8 @@ st.set_page_config(
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
-    "구글 스프레드시트 실시간 연동 SCM 대시보드 (연도별 통계 및 건수 직관적 표시"
-    " 지원)"
+    "구글 스프레드시트 실시간 연동 SCM 대시보드 (모든 검색 영역에"
+    " 선택형/자동완성 필터 적용)"
 )
 
 # 구글 앱스 스크립트 웹 앱 URL 입력
@@ -102,6 +102,69 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           or c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
       ]
       display_df = df.drop(columns=cols_to_drop, errors="ignore")
+
+      # 공통으로 쓰일 컬럼명 정의
+      name_col = [
+          c for c in df.columns if "제품명" in c or "KOREAN NAME" in c
+      ]
+      width_col = [c for c in df.columns if "폭" in c or "width" in c.lower()]
+      item_col = [
+          c
+          for c in df.columns
+          if "ITEM" in c
+          or "아이템" in c
+          or "PILE" in c
+          or "YARN" in c
+      ]
+      agency_col = [c for c in df.columns if "대리점" in c or "AGENCY" in c]
+
+      all_names = (
+          sorted(
+              [
+                  str(x)
+                  for x in df[name_col[0]].dropna().unique()
+                  if str(x).strip() != ""
+              ]
+          )
+          if name_col
+          else []
+      )
+      all_widths = (
+          sorted(
+              [
+                  str(x)
+                  for x in df[width_col[0]].dropna().unique()
+                  if str(x).strip() != ""
+              ],
+              key=lambda x: float(x)
+              if x.replace(".", "", 1).isdigit()
+              else 0,
+          )
+          if width_col
+          else []
+      )
+      all_items = (
+          sorted(
+              [
+                  str(x)
+                  for x in df[item_col[0]].dropna().unique()
+                  if str(x).strip() != ""
+              ]
+          )
+          if item_col
+          else []
+      )
+      all_agencies = (
+          sorted(
+              [
+                  str(x)
+                  for x in df[agency_col[0]].dropna().unique()
+                  if str(x).strip() != ""
+              ]
+          )
+          if agency_col
+          else []
+      )
 
       # ====================================================
       # [메뉴 1] 메인 SCM 대시보드
@@ -248,47 +311,42 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("월별 출고 예정 데이터를 불러올 수 없습니다.")
 
-        # 4. 제품명, 폭 사이즈, 실사종 상세 조건 검색
+        # 4. 메인 상세 조건 검색 (선택형/자동완성 드롭다운 적용)
         st.markdown("---")
-        st.subheader("🔍 상세 조건 검색 (제품명 / 폭 / 실사종)")
+        st.subheader("🔍 상세 조건 검색 (원하는 단어를 선택하거나 검색하세요)")
+
         c1, c2, c3 = st.columns(3)
         with c1:
-          q_name = st.text_input("🏷️ 제품명", "")
+          sel_name = st.selectbox(
+              "🏷️ 제품명 선택/검색",
+              ["전체 선택"] + all_names,
+              key="main_name",
+          )
         with c2:
-          q_width = st.text_input("📏 폭 사이즈 (예: 40)", "")
+          sel_width = st.selectbox(
+              "📏 폭 사이즈 선택/검색",
+              ["전체 선택"] + all_widths,
+              key="main_width",
+          )
         with c3:
-          q_item = st.text_input("🔖 실사종 / ITEM", "")
+          sel_item = st.selectbox(
+              "🔖 실사종 / ITEM 선택/검색",
+              ["전체 선택"] + all_items,
+              key="main_item",
+          )
 
         search_idx = df.index
-        if q_name:
+        if sel_name and sel_name != "전체 선택":
+          match_mask = df[name_col[0]].astype(str).str.contains(sel_name, na=False)
+          search_idx = search_idx.intersection(df[match_mask].index)
+        if sel_width and sel_width != "전체 선택":
           match_mask = (
-              df.astype(str)
-              .apply(lambda row: row.str.contains(q_name, case=False))
-              .any(axis=1)
+              df[width_col[0]].astype(str).str.contains(sel_width, na=False)
           )
           search_idx = search_idx.intersection(df[match_mask].index)
-        if q_width:
-          w_col = [c for c in df.columns if "폭" in c or "width" in c.lower()]
-          if w_col:
-            match_mask = df[w_col[0]].astype(str).str.contains(q_width, case=False)
-            search_idx = search_idx.intersection(df[match_mask].index)
-        if q_item:
-          i_col = [
-              c
-              for c in df.columns
-              if "ITEM" in c
-              or "아이템" in c
-              or "PILE" in c
-              or "YARN" in c
-          ]
-          if i_col:
-            match_mask = (
-                df[i_col]
-                .astype(str)
-                .apply(lambda row: row.str.contains(q_item, case=False))
-                .any(axis=1)
-            )
-            search_idx = search_idx.intersection(df[match_mask].index)
+        if sel_item and sel_item != "전체 선택":
+          match_mask = df[item_col[0]].astype(str).str.contains(sel_item, na=False)
+          search_idx = search_idx.intersection(df[match_mask].index)
 
         search_df = display_df.loc[display_df.index.intersection(search_idx)]
 
@@ -337,175 +395,57 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           st.info("조회할 과거 연도 아카이브 데이터가 없습니다.")
 
       # ====================================================
-      # [메뉴 2] SCM 통계 분석 그래프 (연도별 추이 및 건수 직관적 표시 추가)
+      # [메뉴 2] SCM 통계 분석 그래프 (선택형/자동완성 필터 적용)
       # ====================================================
       elif menu_choice == "📊 SCM 통계 분석 그래프":
-        st.subheader("📊 SCM 통계 분석 리포트 및 조건별 필터")
+        st.subheader("📊 SCM 통계 분석 리포트 및 조건별 선택 필터")
 
         st.markdown(
-            "💡 **통계 분석 필터**: 아래 조건들을 입력하거나 선택하여 원하는"
-            " 항목들만 통계 그래프에 반영할 수 있습니다."
+            "💡 **통계 분석 필터**: 드롭다운을 클릭하거나 키워드를 입력해"
+            " 원하시는 항목을 선택하시면 통계 그래프에 즉시 반영됩니다."
         )
 
-        # 다중 조건 검색 필터 입력창
         sc1, sc2, sc3, sc4 = st.columns(4)
         with sc1:
-          f_agency = st.text_input("🏢 대리점 검색", "")
+          s_agency = st.selectbox(
+              "🏢 대리점 선택/검색", ["전체 선택"] + all_agencies, key="stat_agency"
+          )
         with sc2:
-          f_name = st.text_input("🏷️ 제품명 검색", "")
+          s_name = st.selectbox(
+              "🏷️ 제품명 선택/검색", ["전체 선택"] + all_names, key="stat_name"
+          )
         with sc3:
-          f_width = st.text_input("📏 폭 사이즈", "")
+          s_width = st.selectbox(
+              "📏 폭 사이즈 선택", ["전체 선택"] + all_widths, key="stat_width"
+          )
         with sc4:
-          f_item = st.text_input("🔖 실사종 / ITEM", "")
+          s_item = st.selectbox(
+              "🔖 실사종 / ITEM 선택", ["전체 선택"] + all_items, key="stat_item"
+          )
 
         # 필터 적용
         stat_df = df.copy()
-        if f_agency:
-          ag_col_name = [
-              c for c in stat_df.columns if "대리점" in c or "AGENCY" in c
-          ]
-          if ag_col_name:
-            stat_df = stat_df[
-                stat_df[ag_col_name[0]]
-                .astype(str)
-                .str.contains(f_agency, case=False)
-            ]
-        if f_name:
+        if s_agency and s_agency != "전체 선택":
           stat_df = stat_df[
-              stat_df.astype(str)
-              .apply(lambda row: row.str.contains(f_name, case=False))
-              .any(axis=1)
+              stat_df[agency_col[0]].astype(str).str.contains(s_agency, na=False)
           ]
-        if f_width:
-          w_col_name = [
-              c for c in stat_df.columns if "폭" in c or "width" in c.lower()
+        if s_name and s_name != "전체 선택":
+          stat_df = stat_df[
+              stat_df[name_col[0]].astype(str).str.contains(s_name, na=False)
           ]
-          if w_col_name:
-            stat_df = stat_df[
-                stat_df[w_col_name[0]]
-                .astype(str)
-                .str.contains(f_width, case=False)
-            ]
-        if f_item:
-          i_col_name = [
-              c
-              for c in stat_df.columns
-              if "ITEM" in c
-              or "아이템" in c
-              or "PILE" in c
-              or "YARN" in c
+        if s_width and s_width != "전체 선택":
+          stat_df = stat_df[
+              stat_df[width_col[0]].astype(str).str.contains(s_width, na=False)
           ]
-          if i_col_name:
-            stat_df = stat_df[
-                stat_df[i_col_name]
-                .astype(str)
-                .apply(lambda row: row.str.contains(f_item, case=False))
-                .any(axis=1)
-            ]
+        if s_item and s_item != "전체 선택":
+          stat_df = stat_df[
+              stat_df[item_col[0]].astype(str).str.contains(s_item, na=False)
+          ]
 
         st.info(f"📊 현재 필터가 적용된 통계 대상 데이터: 총 **{len(stat_df)}건**")
         st.markdown("---")
 
-        # 💡 직관적인 건수 확인을 위한 지표(Metric) 요약 추가
+        # 건수 확인 요약 지표
         col_st1, col_st2, col_st3 = st.columns(3)
         col_st1.metric(
-            label="📈 필터된 총 발주 건수", value=f"{len(stat_df)} 건"
-        )
-        completed_stat_count = len(
-            stat_df[stat_df["출고 완료"].astype(str).str.upper() == "O"]
-        )
-        col_st2.metric(
-            label="✅ 출고 완료 건수", value=f"{completed_stat_count} 건"
-        )
-        col_st3.metric(
-            label="⏳ 미출고 건수",
-            value=f"{len(stat_df) - completed_stat_count} 건",
-        )
-
-        st.markdown("---")
-
-        # 💡 연도별 발주 건수 추이 추가
-        st.markdown("#### 📅 연도별 발주 건수 추이 (필터 반영)")
-        if "연도" in stat_df.columns:
-          year_counts = (
-              stat_df["연도"].dropna().astype(int).value_counts().sort_index().reset_index()
-          )
-          year_counts.columns = ["연도", "발주건수"]
-          if not year_counts.empty:
-            # 직관적으로 숫자를 바로 볼 수 있도록 st.dataframe과 bar_chart 병행 제공
-            sc_y1, sc_y2 = st.columns([1, 2])
-            with sc_y1:
-              st.dataframe(
-                  year_counts.set_index("연도"), use_container_width=True
-              )
-            with sc_y2:
-              st.bar_chart(year_counts.set_index("연도"))
-          else:
-            st.warning("조건에 해당하는 연도 데이터가 없습니다.")
-
-        st.markdown("---")
-
-        g1, g2 = st.columns(2)
-        with g1:
-          st.markdown("#### 📅 월별 발주 건수 추이 (필터 반영)")
-          if "발주서 수령_dt" in stat_df.columns:
-            stat_df["발주월"] = stat_df["발주서 수령_dt"].dt.strftime("%Y-%m")
-            m_counts = (
-                stat_df["발주월"].value_counts().sort_index().reset_index()
-            )
-            m_counts.columns = ["월", "발주건수"]
-            if not m_counts.empty:
-              sc_m1, sc_m2 = st.columns([1, 2])
-              with sc_m1:
-                st.dataframe(
-                    m_counts.set_index("월"),
-                    use_container_width=True,
-                    height=250,
-                )
-              with sc_m2:
-                st.bar_chart(m_counts.set_index("월"))
-            else:
-              st.warning("조건에 해당하는 데이터가 없습니다.")
-
-        with g2:
-          st.markdown("#### 🏢 대리점별 발주 비중 Top 10 (필터 반영)")
-          ag_col = [c for c in stat_df.columns if "대리점" in c or "AGENCY" in c]
-          if ag_col:
-            ag_counts = stat_df[ag_col[0]].value_counts().head(10).reset_index()
-            ag_counts.columns = ["대리점", "발주건수"]
-            if not ag_counts.empty:
-              sc_a1, sc_a2 = st.columns([1, 2])
-              with sc_a1:
-                st.dataframe(
-                    ag_counts.set_index("대리점"),
-                    use_container_width=True,
-                    height=250,
-                )
-              with sc_a2:
-                st.bar_chart(ag_counts.set_index("대리점"))
-            else:
-              st.warning("조건에 해당하는 데이터가 없습니다.")
-
-        st.markdown("---")
-        st.markdown("#### 📦 출고 완료 vs 미출고 현황 비율 (필터 반영)")
-        if "출고 완료" in stat_df.columns:
-          status_counts = (
-              stat_df["출고 완료"].fillna("진행중").value_counts().reset_index()
-          )
-          status_counts.columns = ["상태", "건수"]
-          if not status_counts.empty:
-            sc_s1, sc_s2 = st.columns([1, 2])
-            with sc_s1:
-              st.dataframe(
-                  status_counts.set_index("상태"), use_container_width=True
-              )
-            with sc_s2:
-              st.bar_chart(status_counts.set_index("상태"))
-          else:
-            st.warning("조건에 해당하는 데이터가 없습니다.")
-
-    else:
-      st.warning("가져온 데이터가 비어있습니다. 시트 내용을 확인해 주세요.")
-
-  except Exception as e:
-    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
+            label="📈 필터된 총
