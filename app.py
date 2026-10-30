@@ -10,8 +10,8 @@ st.set_page_config(
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
 st.markdown(
-    "구글 스프레드시트 실시간 연동 SCM 대시보드 (미출고 기준 월별 출고 예정"
-    " 관리)"
+    "구글 스프레드시트 실시간 연동 SCM 대시보드 (통계 분석 내 상세 조건 검색"
+    " 지원)"
 )
 
 # 구글 앱스 스크립트 웹 앱 URL 입력
@@ -27,7 +27,7 @@ def load_data(url):
   return response.json()
 
 
-# 사이드바 설정 (통계 분석 그래프 및 새로고침)
+# 사이드바 설정 (메뉴 네비게이션 및 새로고침)
 st.sidebar.title("🗂️ 메뉴 네비게이션")
 menu_choice = st.sidebar.radio(
     "이동할 메뉴:", ["📦 메인 SCM 대시보드", "📊 SCM 통계 분석 그래프"]
@@ -91,7 +91,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           drop=True
       )
 
-      # 4차, 5차 확정납기 및 불필요한 시스템 컬럼 제거
+      # 불필요한 시스템 컬럼 제거
       cols_to_drop = [
           c
           for c in df.columns
@@ -183,11 +183,10 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("납기일 데이터를 확인할 수 없습니다.")
 
-        # 3. 월별 출고 예정 현황 (💡 미출고 건만 대상으로 필터링 적용)
+        # 3. 월별 출고 예정 현황 (미출고 기준)
         st.markdown("---")
         st.subheader("📅 월별 출고 예정 제품 리스트 및 건수 (미출고 기준)")
         if delivery_col and not df["납기_dt"].isna().all():
-          # 출고 완료되지 않은(미출고) 데이터만 추출
           uncompleted_df_raw = df[
               df["출고 완료"].astype(str).str.upper() != "O"
           ].copy()
@@ -227,15 +226,15 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                           "발주서 수령", width="small"
                       ),
                       "확정납기 1차 (DELIVERY 1)": st.column_config.TextColumn(
-                          "확정납기 1차", width="small"
-                      ),
-                      "확정납기 2차 (DELIVERY 2)": st.column_config.TextColumn(
-                          "확정납기 2차", width="small"
-                      ),
-                      "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
-                          "확정납기 3차", width="small"
-                      ),
-                      "출고 완료": st.column_config.TextColumn(
+                        "확정납기 1차", width="small"
+                    ),
+                    "확정납기 2차 (DELIVERY 2)": st.column_config.TextColumn(
+                        "확정납기 2차", width="small"
+                    ),
+                    "확정납기 3차 (DELIVERY 3)": st.column_config.TextColumn(
+                        "확정납기 3차", width="small"
+                    ),
+                    "출고 완료": st.column_config.TextColumn(
                         "출고 완료", width="small"
                     ),
                   },
@@ -338,37 +337,107 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           st.info("조회할 과거 연도 아카이브 데이터가 없습니다.")
 
       # ====================================================
-      # [메뉴 2] SCM 통계 분석 그래프 (사이드바 메뉴)
+      # [메뉴 2] SCM 통계 분석 그래프 (💡 다중 조건 검색 필터 추가)
       # ====================================================
       elif menu_choice == "📊 SCM 통계 분석 그래프":
-        st.subheader("📊 SCM 통계 분석 리포트")
+        st.subheader("📊 SCM 통계 분석 리포트 및 조건별 필터")
+
+        st.markdown(
+            "💡 **통계 분석 필터**: 아래 조건들을 입력하거나 선택하여 원하는"
+            " 항목들만 통계 그래프에 반영할 수 있습니다."
+        )
+
+        # 다중 조건 검색 필터 입력창
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+          f_agency = st.text_input("🏢 대리점 검색", "")
+        with sc2:
+          f_name = st.text_input("🏷️ 제품명 검색", "")
+        with sc3:
+          f_width = st.text_input("📏 폭 사이즈", "")
+        with sc4:
+          f_item = st.text_input("🔖 실사종 / ITEM", "")
+
+        # 필터 적용
+        stat_df = df.copy()
+        if f_agency:
+          ag_col_name = [
+              c for c in stat_df.columns if "대리점" in c or "AGENCY" in c
+          ]
+          if ag_col_name:
+            stat_df = stat_df[
+                stat_df[ag_col_name[0]]
+                .astype(str)
+                .str.contains(f_agency, case=False)
+            ]
+        if f_name:
+          stat_df = stat_df[
+              stat_df.astype(str)
+              .apply(lambda row: row.str.contains(f_name, case=False))
+              .any(axis=1)
+          ]
+        if f_width:
+          w_col_name = [
+              c for c in stat_df.columns if "폭" in c or "width" in c.lower()
+          ]
+          if w_col_name:
+            stat_df = stat_df[
+                stat_df[w_col_name[0]]
+                .astype(str)
+                .str.contains(f_width, case=False)
+            ]
+        if f_item:
+          i_col_name = [
+              c
+              for c in stat_df.columns
+              if "ITEM" in c
+              or "아이템" in c
+              or "PILE" in c
+              or "YARN" in c
+          ]
+          if i_col_name:
+            stat_df = stat_df[
+                stat_df[i_col_name]
+                .astype(str)
+                .apply(lambda row: row.str.contains(f_item, case=False))
+                .any(axis=1)
+            ]
+
+        st.info(f"📊 현재 필터가 적용된 통계 대상 데이터: 총 **{len(stat_df)}건**")
+        st.markdown("---")
 
         g1, g2 = st.columns(2)
         with g1:
-          st.markdown("#### 📅 월별 발주 건수 추이")
-          temp_df = df.copy()
-          if "발주서 수령_dt" in temp_df.columns:
-            temp_df["발주월"] = temp_df["발주서 수령_dt"].dt.strftime("%Y-%m")
+          st.markdown("#### 📅 월별 발주 건수 추이 (필터 반영)")
+          if "발주서 수령_dt" in stat_df.columns:
+            stat_df["발주월"] = stat_df["발주서 수령_dt"].dt.strftime("%Y-%m")
             m_counts = (
-                temp_df["발주월"].value_counts().sort_index().reset_index()
+                stat_df["발주월"].value_counts().sort_index().reset_index()
             )
             m_counts.columns = ["월", "발주건수"]
             if not m_counts.empty:
               st.bar_chart(m_counts.set_index("월"))
+            else:
+              st.warning("조건에 해당하는 데이터가 없습니다.")
 
         with g2:
-          st.markdown("#### 🏢 대리점별 발주 비중 Top 10")
-          ag_col = [c for c in df.columns if "대리점" in c or "AGENCY" in c]
+          st.markdown("#### 🏢 대리점별 발주 비중 Top 10 (필터 반영)")
+          ag_col = [c for c in stat_df.columns if "대리점" in c or "AGENCY" in c]
           if ag_col:
-            ag_counts = df[ag_col[0]].value_counts().head(10)
+            ag_counts = stat_df[ag_col[0]].value_counts().head(10)
             if not ag_counts.empty:
               st.bar_chart(ag_counts)
+            else:
+              st.warning("조건에 해당하는 데이터가 없습니다.")
 
         st.markdown("---")
-        st.markdown("#### 📦 출고 완료 vs 미출고 현황 비율")
-        if "출고 완료" in df.columns:
-          status_counts = df["출고 완료"].fillna("진행중").value_counts()
-          st.bar_chart(status_counts)
+        st.markdown("#### 📦 출고 완료 vs 미출고 현황 비율 (필터 반영)")
+        if "출고 완료" in stat_df.columns:
+          status_counts = stat_df["출고 완료"].fillna("진행중").value_counts()
+          if not status_counts.empty:
+            st.bar_chart(status_counts)
+          else:
+            st.warning("조건에 해당하는 데이터가 없습니다.")
 
     else:
       st.warning("가져온 데이터가 비어있습니다. 시트 내용을 확인해 주세요.")
