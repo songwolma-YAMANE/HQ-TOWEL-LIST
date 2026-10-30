@@ -69,7 +69,7 @@ if not st.session_state.authenticated:
       st.rerun()
   st.stop()
 else:
-  # 이미 인증된 상태에서 페이지 새로고침 시에도 방문/새로고침 기록 자동 누적
+  # 인증된 상태에서 페이지 새로고침 시 방문/새로고침 기록 자동 누적
   if not st.session_state.counted_this_session:
     now_time = datetime.now()
     role_str = "관리자" if st.session_state.is_admin else "일반 사용자"
@@ -158,9 +158,7 @@ st.sidebar.markdown("---")
 if st.sidebar.button("🔒 로그아웃", use_container_width=True):
   st.session_state.authenticated = False
   st.session_state.is_admin = False
-  st.session_state.counted_this_session = (
-      False  # 재로그인 시 카운트 되도록 초기화
-  )
+  st.session_state.counted_this_session = False
   st.success("로그아웃 되었습니다.")
   st.rerun()
 
@@ -186,7 +184,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
               lambda x: f"$ {x:,.4f}" if pd.notnull(x) and x > 0 else ""
           )
 
-      # 날짜 데이터 정제 ('납기 1차' 인식)
+      # 날짜 데이터 정제 (발주서 수령 및 납기 1차)
       if "발주서 수령" in df.columns:
         df["발주서 수령_dt"] = pd.to_datetime(
             df["발주서 수령"], errors="coerce"
@@ -314,7 +312,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             delta_color="inverse",
         )
 
-        # 2. 7일 이내 임박 출고 경고 섹션
+        # 1. [긴급] 7일 이내 출고 임박 리스트
         st.markdown("---")
         st.subheader("🚨 [긴급] 7일 이내 출고 임박 리스트")
         today = datetime.now()
@@ -340,6 +338,29 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             st.success("👍 향후 7일 이내에 출고 임박한 긴급 건이 없습니다.")
         else:
           st.info("납기일 데이터를 확인할 수 없습니다.")
+
+        # 2. ✨ [신규] 최근 7일 이내 추가된 신규 오더 리스트 (요청하신 위치)
+        st.markdown("---")
+        st.subheader("✨ [신규] 최근 7일 이내 추가된 오더 리스트")
+
+        if not df["발주서 수령_dt"].isna().all():
+          seven_days_ago = today - timedelta(days=7)
+          new_order_mask = df["발주서 수령_dt"] >= seven_days_ago
+          new_order_idx = df[new_order_mask].index
+          new_order_df = display_df.loc[
+              display_df.index.intersection(new_order_idx)
+          ]
+
+          if not new_order_df.empty:
+            st.info(
+                f"📌 최근 7일 이내 새로 접수된 신규 오더가 총"
+                f" **{len(new_order_df)}건** 있습니다."
+            )
+            st.dataframe(new_order_df, use_container_width=True)
+          else:
+            st.success("👍 최근 7일 이내에 추가된 신규 오더가 없습니다.")
+        else:
+          st.info("발주서 수령일 데이터를 확인할 수 없습니다.")
 
         # 3. 월별 출고 예정 현황 (미출고 기준)
         st.markdown("---")
