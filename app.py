@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # ====================================================
-# 🔐 권한별 비밀번호 설정 (요청하신 비밀번호 적용 완료)
+# 🔐 권한별 비밀번호 설정
 # ====================================================
 USER_PASSWORD = "songwol1234"  # 직원/공유용 비밀번호
 ADMIN_PASSWORD = "diaksp007099"  # 관리자(본인) 전용 비밀번호
@@ -24,6 +24,11 @@ if "is_admin" not in st.session_state:
 if "visit_logs" not in st.session_state:
   st.session_state.visit_logs = []
 
+# 새로고침 시 중복 과도 카운팅을 막기 위한 세션 체크 플래그
+if "counted_this_session" not in st.session_state:
+  st.session_state.counted_this_session = False
+
+# 로그인 인증 화면
 if not st.session_state.authenticated:
   st.markdown(
       "<br><br><h2 style='text-align: center;'>🔐 SCM 시스템 보안 인증</h2>",
@@ -35,40 +40,46 @@ if not st.session_state.authenticated:
         "접속 비밀번호를 입력하세요", type="password"
     )
     if st.button("로그인", use_container_width=True):
+      now_time = datetime.now()
       if password_input == ADMIN_PASSWORD:
-        # 관리자 비밀번호로 로그인한 경우
         st.session_state.authenticated = True
         st.session_state.is_admin = True
-
-        # 방문 기록 추가
-        now_time = datetime.now()
-        st.session_state.visit_logs.append({
-            "접속시간": now_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "날짜": now_time.strftime("%Y-%m-%d"),
-            "권한": "관리자",
-        })
-
-        st.success("관리자 권한으로 인증되었습니다!")
-        st.rerun()
-
+        role_str = "관리자"
+        success_msg = "관리자 권한으로 인증되었습니다!"
       elif password_input == USER_PASSWORD:
-        # 일반 사용자 비밀번호로 로그인한 경우
         st.session_state.authenticated = True
         st.session_state.is_admin = False
+        role_str = "일반 사용자"
+        success_msg = "인증되었습니다!"
+      else:
+        st.error("비밀번호가 틀렸습니다.")
+        st.stop()
 
-        # 방문 기록 추가
-        now_time = datetime.now()
+      # 방문 기록 추가 (로그인 시점)
+      if not st.session_state.counted_this_session:
         st.session_state.visit_logs.append({
             "접속시간": now_time.strftime("%Y-%m-%d %H:%M:%S"),
             "날짜": now_time.strftime("%Y-%m-%d"),
-            "권한": "일반 사용자",
+            "시간대": now_time.strftime("%H시"),
+            "권한": role_str,
         })
+        st.session_state.counted_this_session = True
 
-        st.success("인증되었습니다!")
-        st.rerun()
-      else:
-        st.error("비밀번호가 틀렸습니다.")
+      st.success(success_msg)
+      st.rerun()
   st.stop()
+else:
+  # 이미 인증된 상태에서 페이지 새로고침 시에도 방문/새로고침 기록 자동 누적
+  if not st.session_state.counted_this_session:
+    now_time = datetime.now()
+    role_str = "관리자" if st.session_state.is_admin else "일반 사용자"
+    st.session_state.visit_logs.append({
+        "접속시간": now_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "날짜": now_time.strftime("%Y-%m-%d"),
+        "시간대": now_time.strftime("%H시"),
+        "권한": role_str,
+    })
+    st.session_state.counted_this_session = True
 
 
 # 로컬 이미지 파일을 Base64로 변환하여 HTML에서 깨지지 않도록 처리하는 함수
@@ -132,7 +143,7 @@ st.sidebar.title("🗂️ 메뉴 네비게이션")
 
 menu_options = ["📦 메인 SCM 대시보드", "📊 SCM 통계 분석 그래프"]
 if st.session_state.is_admin:
-  menu_options.append("🔒 관리자 전용 방문자 통계")  # 관리자에게만 메뉴 추가
+  menu_options.append("🔒 관리자 전용 방문자 통계")
 
 menu_choice = st.sidebar.radio("이동할 메뉴:", menu_options)
 
@@ -140,6 +151,17 @@ st.sidebar.markdown("---")
 if st.sidebar.button("🔄 데이터 새로고침", use_container_width=True):
   load_data.clear()
   st.sidebar.success("캐시 초기화 완료!")
+  st.rerun()
+
+# 🚪 로그아웃 버튼 추가 (사이드바 하단)
+st.sidebar.markdown("---")
+if st.sidebar.button("🔒 로그아웃", use_container_width=True):
+  st.session_state.authenticated = False
+  st.session_state.is_admin = False
+  st.session_state.counted_this_session = (
+      False  # 재로그인 시 카운트 되도록 초기화
+  )
+  st.success("로그아웃 되었습니다.")
   st.rerun()
 
 with st.spinner("구글 시트에서 데이터를 불러오는 중입니다..."):
@@ -561,22 +583,26 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         st.dataframe(filtered_display_df, use_container_width=True, height=400)
 
       # ====================================================
-      # [메뉴 3] 관리자 전용 방문자 통계 (관리자만 접근 가능)
+      # [메뉴 3] 관리자 전용 방문자 통계 및 분석 (관리자만 접근 가능)
       # ====================================================
       elif menu_choice == "🔒 관리자 전용 방문자 통계":
         if st.session_state.is_admin:
           st.markdown("---")
-          st.subheader("🔒 관리자 전용 시스템 접속 및 방문자 통계")
-          st.markdown("이 메뉴는 관리자 계정으로 로그인한 경우에만 표시됩니다.")
+          st.subheader("🔒 관리자 전용 시스템 접속 및 방문자 분석 대시보드")
+          st.markdown(
+              "이 메뉴는 관리자 계정으로 로그인한 경우에만 표시되며, 실시간"
+              " 접속 및 방문 통계를 분석합니다."
+          )
 
           logs = st.session_state.visit_logs
           total_visits = len(logs)
           today_str = datetime.now().strftime("%Y-%m-%d")
           today_visits = sum(1 for log in logs if log["날짜"] == today_str)
 
+          # 요약 메트릭 카드
           v_col1, v_col2 = st.columns(2)
           v_col1.metric(
-              label="📅 오늘 총 방문 횟수",
+              label="📅 오늘 총 방문(새로고침) 횟수",
               value=f"{today_visits} 회",
               delta="오늘",
           )
@@ -587,10 +613,33 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
           )
 
           st.markdown("---")
-          st.subheader("📋 상세 접속 이력 로그")
+
+          # 방문 통계 분석 그래프 영역
           if logs:
             log_df = pd.DataFrame(logs)
-            st.dataframe(log_df, use_container_width=True, height=350)
+
+            v_g1, v_g2 = st.columns(2)
+            with v_g1:
+              st.markdown("### 📈 일자별 방문 추이 분석")
+              daily_visits = log_df["날짜"].value_counts().reset_index()
+              daily_visits.columns = ["날짜", "방문횟수"]
+              daily_visits = daily_visits.sort_values("날짜")
+              st.bar_chart(daily_visits.set_index("날짜"), color="#8b5cf6")
+
+            with v_g2:
+              st.markdown("### ⏰ 시간대별 방문 집중도 분석")
+              hourly_visits = log_df["시간대"].value_counts().reset_index()
+              hourly_visits.columns = ["시간대", "방문횟수"]
+              hourly_visits = hourly_visits.sort_values("시간대")
+              st.bar_chart(hourly_visits.set_index("시간대"), color="#f59e0b")
+
+          st.markdown("---")
+          st.subheader("📋 상세 접속 이력 로그")
+          if logs:
+            log_df_sorted = pd.DataFrame(logs).sort_values(
+                by="접속시간", ascending=False
+            )
+            st.dataframe(log_df_sorted, use_container_width=True, height=350)
           else:
             st.info("기록된 방문 로그가 없습니다.")
         else:
