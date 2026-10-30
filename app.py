@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("📦 본사 문직 제품 수주 및 출고 관리 시스템")
-st.markdown("구글 스프레드시트 실시간 연동 SCM 대시보드 (최신 출고 및 사이드바 메뉴)")
+st.markdown("구글 스프레드시트 실시간 연동 SCM 대시보드")
 
 # 구글 앱스 스크립트 웹 앱 URL 입력
 web_app_url = (
@@ -23,6 +23,18 @@ def load_data(url):
   response = requests.get(url)
   return response.json()
 
+
+# 사이드바 설정 (통계 분석 그래프 및 새로고침)
+st.sidebar.title("🗂️ 메뉴 네비게이션")
+menu_choice = st.sidebar.radio(
+    "이동할 메뉴:", ["📦 메인 SCM 대시보드", "📊 SCM 통계 분석 그래프"]
+)
+
+st.sidebar.markdown("---")
+if st.sidebar.button("🔄 데이터 새로고침", use_container_width=True):
+  load_data.clear()
+  st.sidebar.success("캐시 초기화 완료!")
+  st.rerun()
 
 with st.spinner("구글 시트에서 데이터를 불러오는 중입니다..."):
   try:
@@ -71,31 +83,43 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
       )
       latest_year = years[0] if years else 2026
 
-      # ----------------------------------------------------
-      # 📂 [사이드바 메뉴] 폴더 형식 네비게이션
-      # ----------------------------------------------------
-      st.sidebar.title("🗂️ SCM 메뉴 폴더")
-      menu_mode = st.sidebar.radio(
-          "이동할 메뉴를 선택하세요:",
-          [
-              "📦 메인 수주/출고 관리",
-              "📁 이전 연도 아카이브",
-              "📊 SCM 통계 분석 그래프",
-          ],
-      )
-
-      st.sidebar.markdown("---")
-      if st.sidebar.button("🔄 데이터 새로고침", use_container_width=True):
-        load_data.clear()
-        st.sidebar.success("캐시 초기화 완료!")
-        st.rerun()
-
       # ====================================================
-      # [메뉴 1] 메인 수주/출고 관리 화면
+      # [메뉴 1] 메인 SCM 대시보드
       # ====================================================
-      if menu_mode == "📦 메인 수주/출고 관리":
+      if menu_choice == "📦 메인 SCM 대시보드":
 
-        # 1. 7일 이내 임박 출고 경고 섹션
+        # ----------------------------------------------------
+        # 🟢 이미지 요청 반영: 2026년(최근 연도) 오더/출고/미출고 건수 요약 카드
+        # ----------------------------------------------------
+        st.markdown("---")
+        latest_df = df[df["연도"] == latest_year]
+        total_ordered = len(latest_df)
+        completed_count = len(
+            latest_df[latest_df["출고 완료"].astype(str).str.upper() == "O"]
+        )
+        uncompleted_count = total_ordered - completed_count
+
+        col_k1, col_k2, col_k3 = st.columns(3)
+        col_k1.metric(
+            label=f"🟢 {latest_year}년 오더 건수", value=f"{total_ordered} 건"
+        )
+        col_k2.metric(
+            label=f"🟢 출고 건수",
+            value=f"{completed_count} 건",
+            delta="완료",
+            delta_color="normal",
+        )
+        col_k3.metric(
+            label=f"🟢 미출고 건수",
+            value=f"{uncompleted_count} 건",
+            delta="진행중",
+            delta_color="inverse",
+        )
+
+        # ----------------------------------------------------
+        # 🚨 7일 이내 임박 출고 경고 섹션
+        # ----------------------------------------------------
+        st.markdown("---")
         st.subheader("🚨 [긴급] 7일 이내 출고 임박 리스트")
         today = datetime.now()
         seven_days_later = today + timedelta(days=7)
@@ -118,14 +142,13 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("납기일 데이터를 확인할 수 없습니다.")
 
+        # ----------------------------------------------------
+        # 📅 월별 출고 예정 현황 (최신/미래 기준)
+        # ----------------------------------------------------
         st.markdown("---")
-
-        # 2. 월별 출고 예정 현황 (최신/미래 시간 기준 초점)
         st.subheader("📅 월별 출고 예정 제품 리스트 및 건수")
         if delivery_col and not df["납기_dt"].isna().all():
-          # 이미 지난 달은 제외하고 오늘 이후이거나 최근 유효한 월부터 표시
           df["출고월"] = df["납기_dt"].dt.strftime("%Y-%m")
-          # 미출고 건 위주 또는 최신 순으로 월 정렬
           valid_months = (
               df[df["출고월"].notnull() & (df["출고월"] != "NaT")]
               .sort_values("출고월", ascending=True)["출고월"]
@@ -145,9 +168,10 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         else:
           st.info("월별 출고 예정 데이터를 불러올 수 없습니다.")
 
+        # ----------------------------------------------------
+        # 🔍 제품명, 폭 사이즈, 실사종 상세 조건 검색
+        # ----------------------------------------------------
         st.markdown("---")
-
-        # 3. 통합 다중 조건 검색 (제품명, 폭 사이즈, 실사종)
         st.subheader("🔍 상세 조건 검색 (제품명 / 폭 / 실사종)")
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -191,27 +215,29 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         st.write(f"검색 결과: 총 **{len(search_df)}건**")
         st.dataframe(search_df, use_container_width=True, height=500)
 
-      # ====================================================
-      # [메뉴 2] 이전 연도 아카이브 폴더
-      # ====================================================
-      elif menu_mode == "📁 이전 연도 아카이브":
-        st.subheader("📁 이전 연도 수주/출고 아카이브 폴더")
+        # ----------------------------------------------------
+        # 🟢 이미지 요청 반영: 과거 오더 건수 폴더형식 아카이브
+        # ----------------------------------------------------
+        st.markdown("---")
+        st.subheader("📁 과거 오더 건수 아카이브 (연도별 폴더)")
         past_years = [y for y in years if y < latest_year]
 
         if past_years:
-          tabs = st.tabs([str(py) + "년" for py in past_years])
+          folder_tabs = st.tabs([str(py) + "년도 오더 폴더" for py in past_years])
           for idx, py in enumerate(past_years):
-            with tabs[idx]:
+            with folder_tabs[idx]:
               p_df = df[df["연도"] == py]
-              st.write(f"**{py}년도 데이터** (총 {len(p_df)}건)")
-              st.dataframe(p_df, use_container_width=True, height=600)
+              st.info(
+                  f"📂 {py}년도 과거 오더 내역 (총 {len(p_df)}건 출고 완료 데이터)"
+              )
+              st.dataframe(p_df, use_container_width=True, height=500)
         else:
-          st.info("조회할 이전 연도 데이터가 없습니다.")
+          st.info("조회할 과거 연도 아카이브 데이터가 없습니다.")
 
       # ====================================================
-      # [메뉴 3] SCM 통계 분석 그래프 폴더
+      # [메뉴 2] SCM 통계 분석 그래프 (사이드바 메뉴)
       # ====================================================
-      elif menu_mode == "📊 SCM 통계 분석 그래프":
+      elif menu_choice == "📊 SCM 통계 분석 그래프":
         st.subheader("📊 SCM 통계 분석 리포트")
 
         g1, g2 = st.columns(2)
