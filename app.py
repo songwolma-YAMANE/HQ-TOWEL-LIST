@@ -85,7 +85,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
         if data and len(data) > 0:
             df = pd.DataFrame(data)
 
-            # 1. 통화 포맷 적용 ($) - 소수점 넷째 자리(:,.4f)까지 표시되도록 수정
+            # 1. 통화 포맷 적용 ($) - 소수점 넷째 자리(:,.4f)까지 표시
             for col in df.columns:
                 if (
                     "단가" in col
@@ -107,7 +107,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                         else ""
                     )
 
-            # 날짜 데이터 정제
+            # 날짜 데이터 정제 (변경하신 '납기 1차' 또는 기존 키워드 자동 인식)
             if "발주서 수령" in df.columns:
                 df["발주서 수령_dt"] = pd.to_datetime(
                     df["발주서 수령"], errors="coerce"
@@ -117,7 +117,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
 
             delivery_col = None
             for c in df.columns:
-                if "확정납기 1차" in c or "DELIVERY 1" in c:
+                if "납기 1차" in c or "확정납기 1차" in c or "DELIVERY 1" in c:
                     delivery_col = c
                     break
 
@@ -137,15 +137,11 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 by="발주서 수령_dt", ascending=False
             ).reset_index(drop=True)
 
-            # 불필요한 시스템 컬럼 제거
+            # 불필요한 시스템 컬럼 제거 (4차, 5차 등 필요시 조정)
             cols_to_drop = [
                 c
                 for c in df.columns
-                if "4차" in c
-                or "5차" in c
-                or "DELIVERY 4" in c
-                or "DELIVERY 5" in c
-                or c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
+                if c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
             ]
             display_df = df.drop(columns=cols_to_drop, errors="ignore")
 
