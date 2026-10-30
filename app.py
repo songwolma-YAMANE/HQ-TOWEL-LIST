@@ -107,7 +107,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                         else ""
                     )
 
-            # 날짜 데이터 정제 ('납기 1차' 또는 기존 키워드 자동 인식)
+            # 날짜 데이터 정제 ('납기 1차' 인식)
             if "발주서 수령" in df.columns:
                 df["발주서 수령_dt"] = pd.to_datetime(
                     df["발주서 수령"], errors="coerce"
@@ -127,6 +127,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 df["납기_dt"] = pd.NaT
 
             df["연도"] = df["발주서 수령_dt"].dt.year
+            df["발주월"] = df["발주서 수령_dt"].dt.strftime("%Y-%m")
             years = sorted(
                 [int(y) for y in df["연도"].dropna().unique()], reverse=True
             )
@@ -137,7 +138,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 by="발주서 수령_dt", ascending=False
             ).reset_index(drop=True)
 
-            # 🛑 불필요한 시스템 컬럼 및 4차, 5차(납기 5차 등) 컬럼 숨기기/제거
+            # 불필요한 시스템 컬럼(4차, 5차 등) 제거
             cols_to_drop = [
                 c
                 for c in df.columns
@@ -145,7 +146,7 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                 or "5차" in c
                 or "DELIVERY 4" in c
                 or "DELIVERY 5" in c
-                or c in ["발주서 수령_dt", "납기_dt", "연도", "출고월", "발주월"]
+                or c in ["발주서 수령_dt", "납기_dt"]
             ]
             display_df = df.drop(columns=cols_to_drop, errors="ignore")
 
@@ -220,7 +221,6 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
             # [메뉴 1] 메인 SCM 대시보드
             # ====================================================
             if menu_choice == "📦 메인 SCM 대시보드":
-                # 1. 2026년(최근 연도) 핵심 요약 카드
                 st.markdown("---")
                 latest_df_raw = df[df["연도"] == latest_year]
                 total_ordered = len(latest_df_raw)
@@ -417,39 +417,160 @@ with st.spinner("구글 시트에서 데이터를 불러오는 중입니다...")
                     st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
 
             # ====================================================
-            # [메뉴 2] SCM 통계 분석 그래프
+            # [메뉴 2] SCM 통계 분석 그래프 (조건별 상세 분석 대폭 강화)
             # ====================================================
             elif menu_choice == "📊 SCM 통계 분석 그래프":
                 st.markdown("---")
-                st.subheader("📊 연도별 및 상태별 SCM 통계 분석")
+                st.subheader("📊 조건별 맞춤형 SCM 통계 분석 대시보드")
+                st.markdown(
+                    "원하는 조건을 선택하면 해당 조건에 맞는 **연도별/월별"
+                    " 통계와 건수**가 즉시 분석됩니다."
+                )
 
-                yearly_counts = df["연도"].value_counts().reset_index()
-                yearly_counts.columns = ["연도", "오더 건수"]
-                yearly_counts = yearly_counts.sort_values("연도")
+                # 다중 조건 검색 필터 박스 생성
+                with st.expander(
+                    "🎯 분석 조건 상세 설정 (클릭하여 열기/닫기)", expanded=True
+                ):
+                    sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+                    with sc1:
+                        stat_agency = st.selectbox(
+                            "🏢 대리점 선택",
+                            ["전체 선택"] + all_agencies,
+                            key="stat_agency",
+                        )
+                    with sc2:
+                        stat_name = st.selectbox(
+                            "🏷️ 제품명 선택",
+                            ["전체 선택"] + all_names,
+                            key="stat_name",
+                        )
+                    with sc3:
+                        stat_width = st.selectbox(
+                            "📏 폭 사이즈",
+                            ["전체 선택"] + all_widths,
+                            key="stat_width",
+                        )
+                    with sc4:
+                        stat_item = st.selectbox(
+                            "🔖 실사종 / ITEM",
+                            ["전체 선택"] + all_items,
+                            key="stat_item",
+                        )
+                    with sc5:
+                        stat_year = st.selectbox(
+                            "📅 연도 선택",
+                            ["전체 선택"] + [str(y) for y in years],
+                            key="stat_year",
+                        )
 
-                col_stat1, col_stat2 = st.columns(2)
+                # 조건 필터링 적용
+                stat_idx = df.index
+                if stat_agency and stat_agency != "전체 선택":
+                    m = (
+                        df[agency_col[0]].astype(str).str.strip()
+                        == str(stat_agency).strip()
+                    )
+                    stat_idx = stat_idx.intersection(df[m].index)
+                if stat_name and stat_name != "전체 선택":
+                    m = (
+                        df[name_col[0]].astype(str).str.strip()
+                        == str(stat_name).strip()
+                    )
+                    stat_idx = stat_idx.intersection(df[m].index)
+                if stat_width and stat_width != "전체 선택":
+                    m = (
+                        df[width_col[0]].astype(str).str.strip()
+                        == str(stat_width).strip()
+                    )
+                    stat_idx = stat_idx.intersection(df[m].index)
+                if stat_item and stat_item != "전체 선택":
+                    m = (
+                        df[item_col[0]].astype(str).str.strip()
+                        == str(stat_item).strip()
+                    )
+                    stat_idx = stat_idx.intersection(df[m].index)
+                if stat_year and stat_year != "전체 선택":
+                    m = df["연도"].astype(str) == str(stat_year)
+                    stat_idx = stat_idx.intersection(df[m].index)
 
-                with col_stat1:
-                    st.markdown("### 📈 연도별 수주 건수 추이")
-                    if not yearly_counts.empty:
+                filtered_stat_df = df.loc[df.index.intersection(stat_idx)]
+                filtered_display_df = display_df.loc[
+                    display_df.index.intersection(stat_idx)
+                ]
+
+                # 📌 핵심 요약 건수 강조 멧트릭 카드
+                st.markdown("---")
+                f_total = len(filtered_stat_df)
+                f_completed = len(
+                    filtered_stat_df[
+                        filtered_stat_df["출고 완료"].astype(str).str.upper()
+                        == "O"
+                    ]
+                )
+                f_uncompleted = f_total - f_completed
+
+                mc1, mc2, mc3 = st.columns(3)
+                mc1.metric(
+                    label="📊 조건 검색된 총 오더 건수",
+                    value=f"{f_total} 건",
+                    delta="조회 결과",
+                )
+                mc2.metric(
+                    label="✅ 출고 완료 건수",
+                    value=f"{f_completed} 건",
+                    delta="완료",
+                    delta_color="normal",
+                )
+                mc3.metric(
+                    label="⏳ 미출고 진행 건수",
+                    value=f"{f_uncompleted} 건",
+                    delta="진행중",
+                    delta_color="inverse",
+                )
+                st.markdown("---")
+
+                # 그래프 및 표 시각화 영역
+                col_g1, col_g2 = st.columns(2)
+
+                with col_g1:
+                    st.markdown("### 📈 연도별 수주 건수 분석")
+                    if not filtered_stat_df.empty:
+                        y_trend = (
+                            filtered_stat_df["연도"]
+                            .dropna()
+                            .value_counts()
+                            .reset_index()
+                        )
+                        y_trend.columns = ["연도", "건수"]
+                        y_trend = y_trend.sort_values("연도")
                         st.bar_chart(
-                            yearly_counts.set_index("연도"), color="#ff6b6b"
+                            y_trend.set_index("연도"), color="#3b82f6"
                         )
                     else:
-                        st.info("표시할 연도별 데이터가 없습니다.")
+                        st.info("조건에 해당하는 연도별 데이터가 없습니다.")
 
-                with col_stat2:
-                    st.markdown("### 🏷️ 주요 대리점별 오더 비중")
-                    if agency_col:
-                        agency_counts = (
-                            df[agency_col[0]].value_counts().reset_index()
+                with col_g2:
+                    st.markdown("### 📅 월별 수주 추이 분석")
+                    if not filtered_stat_df.empty:
+                        m_trend = (
+                            filtered_stat_df["발주월"]
+                            .dropna()
+                            .value_counts()
+                            .reset_index()
                         )
-                        agency_counts.columns = ["대리점명", "건수"]
-                        st.dataframe(
-                            agency_counts, use_container_width=True, height=250
+                        m_trend.columns = ["발주월", "건수"]
+                        m_trend = m_trend.sort_values("발주월")
+                        st.bar_chart(
+                            m_trend.set_index("발주월"), color="#10b981"
                         )
                     else:
-                        st.info("대리점 컬럼을 찾을 수 없습니다.")
+                        st.info("조건에 해당하는 월별 데이터가 없습니다.")
+
+                st.markdown("---")
+                st.subheader("📋 조건별 상세 검색 결과 목록")
+                st.dataframe(
+                    filtered_display_df, use_container_width=True, height=400
+                )
 
     except Exception as e:
         st.error(f"데이터를 불러오거나 처리하는 중 오류가 발생했습니다: {e}")
