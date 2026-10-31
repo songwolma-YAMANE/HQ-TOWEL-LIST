@@ -265,13 +265,6 @@ translations = {
     },
 }
 
-# 사이드바 상단에 언어 선택 셀렉트박스 배치
-selected_lang = st.sidebar.selectbox(
-    "🌐 언어 / Language / Ngôn ngữ", ["한국어", "English", "Tiếng Việt"]
-)
-dict_t = translations[selected_lang]
-
-
 # ====================================================
 # 🔐 권한별 비밀번호 설정
 # ====================================================
@@ -291,26 +284,26 @@ if "counted_this_session" not in st.session_state:
 # 로그인 인증 화면
 if not st.session_state.authenticated:
   st.markdown(
-      f"<br><br><h2 style='text-align: center;'>{dict_t['auth_title']}</h2>",
+      f"<br><br><h2 style='text-align: center;'>🔐 SCM 시스템 보안 인증</h2>",
       unsafe_allow_html=True,
   )
   col1, col2, col3 = st.columns([1, 1, 1])
   with col2:
-    password_input = st.text_input(dict_t["pw_input"], type="password")
-    if st.button(dict_t["login_btn"], use_container_width=True):
+    password_input = st.text_input("접속 비밀번호를 입력하세요", type="password")
+    if st.button("로그인", use_container_width=True):
       now_time = datetime.now()
       if password_input == ADMIN_PASSWORD:
         st.session_state.authenticated = True
         st.session_state.is_admin = True
         role_str = "관리자"
-        success_msg = dict_t["admin_success"]
+        success_msg = "관리자 권한으로 인증되었습니다!"
       elif password_input == USER_PASSWORD:
         st.session_state.authenticated = True
         st.session_state.is_admin = False
         role_str = "일반 사용자"
-        success_msg = dict_t["login_success"]
+        success_msg = "인증되었습니다!"
       else:
-        st.error(dict_t["pw_error"])
+        st.error("비밀번호가 틀렸습니다.")
         st.stop()
 
       if not st.session_state.counted_this_session:
@@ -338,7 +331,7 @@ else:
     st.session_state.counted_this_session = True
 
 
-# 로컬 이미지 파일을 Base64로 변환하여 HTML에서 깨지지 않도록 처리하는 함수
+# 로컬 이미지 파일들을 Base64로 변환 (로고 2종 모두 로드하되 두 번째 로고에서 VINA 문구 제거용 처리)
 def get_base64_image(image_path):
   try:
     with open(image_path, "rb") as f:
@@ -349,10 +342,18 @@ def get_base64_image(image_path):
 
 
 img_korea_base64 = get_base64_image("logo_korea.png")
-img_vina_base64 = get_base64_image("logo_vina.png")
+img_vina_base64 = get_base64_image(
+    "logo_vina.png"
+)  # 파일명은 그대로 유지하되 화면 표시는 SONGWOL로 처리
+
+# 사이드바 언어 선택 셀렉트박스
+selected_lang = st.sidebar.selectbox(
+    "🌐 언어 / Language / Ngôn ngữ", ["한국어", "English", "Tiếng Việt"]
+)
+dict_t = translations[selected_lang]
 
 # ----------------------------------------------------
-# 🏢 상단 오리지널 로고 나란히 배치 및 정렬(ALIGN) 최적화
+# 🏢 상단 오리지널 로고 나란히 배치 (원래 위치 및 VINA 제거 반영)
 # ----------------------------------------------------
 st.markdown(
     f"""
@@ -371,7 +372,7 @@ st.markdown(
     </style>
     <div class="brand-logo-wrapper">
         <img src="data:image/png;base64,{img_korea_base64}" alt="SONGWOL KOREA">
-        <img src="data:image/png;base64,{img_vina_base64}" alt="SONGWOL VINA">
+        <img src="data:image/png;base64,{img_vina_base64}" alt="SONGWOL">
     </div>
 """,
     unsafe_allow_html=True,
@@ -391,7 +392,7 @@ def load_data(url):
   return response.json()
 
 
-# 사이드바 설정
+# 사이드바 메뉴 네비게이션 설정
 st.sidebar.title(dict_t["nav_title"])
 
 menu_options = [dict_t["menu_main"], dict_t["menu_stat"]]
@@ -577,9 +578,7 @@ with st.spinner(dict_t["loading"]):
           ]
 
           if not imminent_df.empty:
-            st.error(
-                dict_t["imminent_alert"].format(count=len(imminent_df))
-            )
+            st.error(dict_t["imminent_alert"].format(count=len(imminent_df)))
             st.dataframe(imminent_df, use_container_width=True)
           else:
             st.success(dict_t["imminent_none"])
@@ -703,14 +702,24 @@ with st.spinner(dict_t["loading"]):
 
         if past_years:
           folder_tabs = st.tabs(
-              [str(py) + ("년도" if selected_lang == "한국어" else " Year") for py in past_years]
+              [
+                  str(py)
+                  + (
+                      "년도"
+                      if selected_lang == "한국어"
+                      else (" Year" if selected_lang == "English" else " Năm")
+                  )
+                  for py in past_years
+              ]
           )
           for idx, py in enumerate(past_years):
             py_val = past_years[idx]
             with folder_tabs[idx]:
               p_idx = df[df["연도"] == py_val].index
               p_df = display_df.loc[display_df.index.intersection(p_idx)]
-              st.info(dict_t["archive_info"].format(year=py_val, count=len(p_df)))
+              st.info(
+                  dict_t["archive_info"].format(year=py_val, count=len(p_df))
+              )
               st.dataframe(p_df, use_container_width=True, height=400)
         else:
           st.info("조회 가능한 과거 연도 아카이브 데이터가 없습니다.")
