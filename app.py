@@ -157,6 +157,7 @@ try:
   completed_col = find_col(["출고 완료", "출고완료"])
   order_date_col = find_col(["발주서 수령", "발주서", "수령일"])
   yarn_col = find_col(["yarn", "사종", "번수", "pile", "실"])
+  width_col = find_col(["cm", "폭", "규격", "사이즈"])
 
   pcs_col = find_col(["order pcs", "pcs", "수량", "장수"])
   kg_col = find_col(["order kg", "kg", "중량"])
@@ -330,7 +331,7 @@ try:
         )
       if product_col in filtered_df.columns:
         cond = cond | filtered_df[product_col].astype(str).str.contains(
-            search_query, nc=False, case=False
+            search_query, na=False, case=False
         )
       filtered_df = filtered_df[cond]
 
@@ -374,56 +375,120 @@ try:
       st.warning("Agency column not found.")
 
   elif menu == t["menu_4"]:
-    st.subheader("📈 멀티 조건 복합 필터 비교 분석 시스템 (발주일 기준)")
-
+    st.subheader("📈 종합 멀티 조건 복합 필터 분석 시스템 (발주일 기준)")
     st.markdown(
-        "원하시는 조건들을 **동시에 여러 개 선택**하여 조합해 보세요. 선택한"
-        " 조건에 맞는 상세 오더 내역과 요약 통계를 바로 확인하실 수 있습니다."
+        "원하시는 조건들을 **동시에 여러 개 선택(Multi-select)**하여 복합"
+        " 검색하세요. 선택한 조건에 맞는 상세 오더 내역과 요약 통계를 바로"
+        " 확인하실 수 있습니다."
     )
 
-    # 멀티 필터 입력 UI (2개 컬럼으로 배치하여 깔끔하게 구성)
-    f_col1, f_col2 = st.columns(2)
+    # 3단 컬럼 레이아웃으로 효율적인 필터 배치
+    f_col1, f_col2, f_col3 = st.columns(3)
 
     with f_col1:
-      # 1. 연도 멀티 선택
+      # 1. 연도 선택
       available_years = (
           sorted([y for y in df["__ORDER_YEAR"].unique() if y > 0])
           if "__ORDER_YEAR" in df.columns
           else []
       )
       sel_years = st.multiselect(
-          "📅 연도 선택 (복수 선택 가능)", available_years
+          "📅 연도별 (Year)", available_years, placeholder="전체 연도"
       )
 
-      # 2. 대리점 멀티 선택
+      # 2. 월 선택
+      available_months = (
+          sorted(df[df["__ORDER_MONTH"] != ""]["__ORDER_MONTH"].unique().tolist())
+          if "__ORDER_MONTH" in df.columns
+          else []
+      )
+      sel_months = st.multiselect(
+          "🗓️ 월별 (Month)", available_months, placeholder="전체 월"
+      )
+
+      # 3. 대리점 선택
       available_agencies = (
           sorted(df[agency_col].dropna().unique().tolist())
           if agency_col and agency_col in df.columns
           else []
       )
       sel_agencies = st.multiselect(
-          "🏢 대리점 선택 (복수 선택 가능)", available_agencies
+          "🏢 대리점별 (Agency)", available_agencies, placeholder="전체 대리점"
       )
 
     with f_col2:
-      # 3. YARN(사종) 멀티 선택
+      # 4. 출하처 선택
+      available_ships = (
+          sorted(df[ship_col].dropna().unique().tolist())
+          if ship_col and ship_col in df.columns
+          else []
+      )
+      sel_ships = st.multiselect(
+          "🚢 출하처별 (Shipment)", available_ships, placeholder="전체 출하처"
+      )
+
+      # 5. YARN(사종) 선택
       available_yarns = (
           sorted(df[yarn_col].dropna().unique().tolist())
           if yarn_col and yarn_col in df.columns
           else []
       )
       sel_yarns = st.multiselect(
-          "🧵 YARN(사종) 선택 (복수 선택 가능)", available_yarns
+          "🧵 YARN(사종)별", available_yarns, placeholder="전체 사종"
       )
 
-      # 4. 아이템 이름 멀티 선택
+      # 6. 아이템 이름 선택
       available_products = (
           sorted(df[product_col].dropna().unique().tolist())
           if product_col and product_col in df.columns
           else []
       )
       sel_products = st.multiselect(
-          "🏷️ 아이템 이름 선택 (복수 선택 가능)", available_products
+          "🏷️ 아이템별 (Product)", available_products, placeholder="전체 아이템"
+      )
+
+    with f_col3:
+      # 7. 규격/폭 선택
+      available_widths = (
+          sorted(df[width_col].dropna().unique().tolist())
+          if width_col and width_col in df.columns
+          else []
+      )
+      sel_widths = st.multiselect(
+          "📏 규격/폭별 (Width)", available_widths, placeholder="전체 규격"
+      )
+
+      # 8. 출고 완료 여부 선택
+      available_status = (
+          sorted(df[completed_col].dropna().unique().tolist())
+          if completed_col and completed_col in df.columns
+          else []
+      )
+      sel_status = st.multiselect(
+          "✅ 출고 완료 여부 (O/기타)",
+          available_status,
+          placeholder="전체 상태",
+      )
+
+      # 9. 수량(PCS) 및 중량(Kg) 범위 검색 슬라이더
+      st.markdown("⚖️ **수량 및 중량 상세 범위**")
+      min_pcs, max_pcs = (
+          int(df["__PCS_NUM"].min()),
+          int(df["__PCS_NUM"].max()),
+      )
+      pcs_range = st.slider(
+          "장수 (PCS) 범위", min_value=min_pcs, max_value=max_pcs, value=(min_pcs, max_pcs)
+      )
+
+      min_kg, max_kg = float(df["__KG_NUM"].min()), float(df["__KG_NUM"].max())
+      # 값이 모두 0이거나 동일할 경우 예외 처리
+      if min_kg == max_kg:
+        max_kg = min_kg + 1.0
+      kg_range = st.slider(
+          "중량 (Kg) 범위",
+          min_value=min_kg,
+          max_value=max_kg,
+          value=(min_kg, max_kg),
       )
 
     # 필터링 로직 적용
@@ -433,9 +498,17 @@ try:
       filtered_analysis_df = filtered_analysis_df[
           filtered_analysis_df["__ORDER_YEAR"].isin(sel_years)
       ]
+    if sel_months:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df["__ORDER_MONTH"].isin(sel_months)
+      ]
     if sel_agencies and agency_col:
       filtered_analysis_df = filtered_analysis_df[
           filtered_analysis_df[agency_col].isin(sel_agencies)
+      ]
+    if sel_ships and ship_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[ship_col].isin(sel_ships)
       ]
     if sel_yarns and yarn_col:
       filtered_analysis_df = filtered_analysis_df[
@@ -445,10 +518,26 @@ try:
       filtered_analysis_df = filtered_analysis_df[
           filtered_analysis_df[product_col].isin(sel_products)
       ]
+    if sel_widths and width_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[width_col].isin(sel_widths)
+      ]
+    if sel_status and completed_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[completed_col].isin(sel_status)
+      ]
+
+    # PCS / Kg 슬라이더 범위 필터 적용
+    filtered_analysis_df = filtered_analysis_df[
+        (filtered_analysis_df["__PCS_NUM"] >= pcs_range[0])
+        & (filtered_analysis_df["__PCS_NUM"] <= pcs_range[1])
+        & (filtered_analysis_df["__KG_NUM"] >= kg_range[0])
+        & (filtered_analysis_df["__KG_NUM"] <= kg_range[1])
+    ]
 
     st.markdown("---")
     st.subheader(
-        f"📊 복합 필터 검색 결과 (총 {len(filtered_analysis_df):,}건)"
+        f"📊 멀티 복합 필터 검색 결과 (총 {len(filtered_analysis_df):,}건)"
     )
 
     if not filtered_analysis_df.empty:
@@ -483,36 +572,45 @@ try:
       )
 
       # AI 자동 분석 리포트 코멘트
-      st.markdown("### 💡 AI 멀티 조건 분석 요약 코멘트")
+      st.markdown("### 💡 AI 멀티 복합 조건 분석 요약 코멘트")
       active_conditions = []
       if sel_years:
         active_conditions.append(f"연도: {list(sel_years)}")
+      if sel_months:
+        active_conditions.append(f"월: {list(sel_months)}")
       if sel_agencies:
         active_conditions.append(f"대리점: {list(sel_agencies)}")
+      if sel_ships:
+        active_conditions.append(f"출하처: {list(sel_ships)}")
       if sel_yarns:
         active_conditions.append(f"사종: {list(sel_yarns)}")
       if sel_products:
         active_conditions.append(f"아이템: {list(sel_products)}")
+      if sel_widths:
+        active_conditions.append(f"규격: {list(sel_widths)}")
+      if sel_status:
+        active_conditions.append(f"출고상태: {list(sel_status)}")
 
       cond_str = (
           ", ".join(active_conditions)
           if active_conditions
-          else "전체 조건 (필터 없음)"
+          else "전체 조건 (기본 범위)"
       )
 
       comment = f"""
-            > **[복합 조건 분석 리포트]**
-            > - **적용된 검색 조건**: {cond_str}
+            > **[종합 복합 조건 분석 리포트]**
+            > - **적용된 다중 조건**: {cond_str}
+            > - **수량(PCS) 및 중량(Kg) 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
-            > - **누적 수량 및 중량**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 다중 필터를 통해 원하시는 특정 년도, 대리점, 사종별 데이터를 정확하게 추출하여 비교 검토하실 수 있습니다.
+            > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
+            > - 연도, 월, 대리점, 사종, 아이템뿐만 아니라 규격과 수량 범위까지 완벽하게 교차 분석하여 생산 및 영업 계획에 활용하실 수 있습니다.
             """
       st.markdown(comment)
 
     else:
       st.warning(
-          "선택하신 복합 조건에 일치하는 오더 데이터가 없습니다. 필터를"
-          " 조절해 주세요."
+          "선택하신 다중 복합 조건에 일치하는 오더 데이터가 없습니다. 필터"
+          " 항목을 조금 더 넓게 조정해 보세요."
       )
 
   elif menu == t["menu_5"]:
