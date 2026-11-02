@@ -1,4 +1,6 @@
-openpyxl
-pandas
 streamlit
+pandas
 requests
+gspread
+Pillow
+oauth2client
