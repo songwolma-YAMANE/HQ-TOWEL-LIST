@@ -153,14 +153,15 @@ try:
   date_col = find_col(["확정납기 1차", "DELIVERY 1", "납기"])
   agency_col = find_col(["대리점", "AGENCY"])
   ship_col = find_col(["출하처", "SHIPMENT"])
-  product_col = find_col(["제품명", "KOREAN NAME"])
+  product_col = find_col(["제품명", "KOREAN NAME", "품명"])
   completed_col = find_col(["출고 완료", "출고완료"])
   order_date_col = find_col(["발주서 수령", "발주서", "수령일"])
-  yarn_col = find_col(["yarn", "번수", "실"])
 
-  pcs_col = find_col(["order pcs", "pcs", "수량"])
+  # 사종(Yarn) 컬럼 정밀 탐색 (pile, yarn, 사종, 번수 등)
+  yarn_col = find_col(["yarn", "사종", "번수", "pile", "실"])
+
+  pcs_col = find_col(["order pcs", "pcs", "수량", "장수"])
   kg_col = find_col(["order kg", "kg", "중량"])
-  width_col = find_col(["cm", "폭", "규격"])
 
   df["__PCS_NUM"] = (
       pd.to_numeric(
@@ -228,7 +229,6 @@ try:
 
   if order_date_col and order_date_col in df.columns:
     df["__ORDER_DATE"] = pd.to_datetime(df[order_date_col], errors="coerce")
-    # 오더 발주일 기준 연도 및 월 세팅 (2027년 비정상 집계 방지)
     df["__ORDER_YEAR"] = df["__ORDER_DATE"].dt.year.fillna(0).astype(int)
     df["__ORDER_MONTH"] = df["__ORDER_DATE"].dt.to_period("M").astype(str)
   else:
@@ -378,142 +378,130 @@ try:
   elif menu == t["menu_4"]:
     st.subheader("📈 다차원 비교 분석 시스템 (발주일 기준)")
 
-    # 탭 디자인을 적용하여 가독성과 검색 편의성 대폭 개선
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📅 기간별 분석 (연도/월)",
-        "🏢 거래처별 분석 (대리점)",
-        "🏷️ 품목 및 사종별 (제품/Yarn)",
-        "📊 수량 및 중복 분석 (PCS/Kg/빈도)",
-    ])
+    # 가장 직관적이고 효율적인 단일 셀렉트박스 방식으로 개편
+    analysis_type = st.selectbox(
+        "🔍 분석 기준을 선택하세요",
+        [
+            "연도별 (Yearly)",
+            "월별 (Monthly)",
+            "대리점별 (Agency)",
+            "아이템 이름별 (Product Name)",
+            "YARN(PILE) 사종별 (Yarn)",
+            "장수별 (PCS)",
+            "Kg별 (Weight)",
+            "오더 중복 횟수별 (Frequency)",
+        ],
+    )
 
     summary_df = pd.DataFrame()
     chart_col = None
-    analysis_type_name = ""
+    analysis_type_name = analysis_type
 
-    with tab1:
-      sub_choice = st.radio(
-          "기간 기준 선택", ["연도별 (Yearly)", "월별 (Monthly)"], horizontal=True
+    if analysis_type == "연도별 (Yearly)" and "__ORDER_YEAR" in df.columns:
+      summary_df = (
+          df[df["__ORDER_YEAR"] > 0]
+          .groupby("__ORDER_YEAR")
+          .agg(
+              Orders=("__ORDER_YEAR", "count"),
+              Total_Pcs=("__PCS_NUM", "sum"),
+              Total_Kg=("__KG_NUM", "sum"),
+          )
+          .reset_index()
       )
-      if sub_choice == "연도별 (Yearly)" and "__ORDER_YEAR" in df.columns:
-        analysis_type_name = "연도별 오더 발주"
-        summary_df = (
-            df[df["__ORDER_YEAR"] > 0]
-            .groupby("__ORDER_YEAR")
-            .agg(
-                Orders=("__ORDER_YEAR", "count"),
-                Total_Pcs=("__PCS_NUM", "sum"),
-                Total_Kg=("__KG_NUM", "sum"),
-            )
-            .reset_index()
-        )
-        chart_col = "__ORDER_YEAR"
-      elif sub_choice == "월별 (Monthly)" and "__ORDER_MONTH" in df.columns:
-        analysis_type_name = "월별 오더 발주"
-        summary_df = (
-            df[df["__ORDER_MONTH"] != ""]
-            .groupby("__ORDER_MONTH")
-            .agg(
-                Orders=("__ORDER_MONTH", "count"),
-                Total_Pcs=("__PCS_NUM", "sum"),
-                Total_Kg=("__KG_NUM", "sum"),
-            )
-            .reset_index()
-        )
-        chart_col = "__ORDER_MONTH"
+      chart_col = "__ORDER_YEAR"
 
-    with tab2:
-      if agency_col in df.columns:
-        analysis_type_name = "대리점별"
-        summary_df = (
-            df.groupby(agency_col)
-            .agg(
-                Orders=(agency_col, "count"),
-                Total_Pcs=("__PCS_NUM", "sum"),
-                Total_Kg=("__KG_NUM", "sum"),
-            )
-            .reset_index()
-            .sort_values(by="Orders", ascending=False)
-        )
-        chart_col = agency_col
-      else:
-        st.warning("대리점 컬럼을 찾을 수 없습니다.")
-
-    with tab3:
-      p_choice = st.radio(
-          "항목 선택",
-          ["아이템 이름별 (Product Name)", "YARN(PILE) 사종별 (Yarn)"],
-          horizontal=True,
+    elif analysis_type == "월별 (Monthly)" and "__ORDER_MONTH" in df.columns:
+      summary_df = (
+          df[df["__ORDER_MONTH"] != ""]
+          .groupby("__ORDER_MONTH")
+          .agg(
+              Orders=("__ORDER_MONTH", "count"),
+              Total_Pcs=("__PCS_NUM", "sum"),
+              Total_Kg=("__KG_NUM", "sum"),
+          )
+          .reset_index()
       )
-      if (
-          p_choice == "아이템 이름별 (Product Name)"
-          and product_col in df.columns
-      ):
-        analysis_type_name = "아이템 이름별"
-        summary_df = (
-            df.groupby(product_col)
-            .agg(
-                Orders=(product_col, "count"),
-                Total_Pcs=("__PCS_NUM", "sum"),
-                Total_Kg=("__KG_NUM", "sum"),
-            )
-            .reset_index()
-            .sort_values(by="Orders", ascending=False)
-        )
-        chart_col = product_col
-      elif p_choice == "YARN(PILE) 사종별 (Yarn)" and yarn_col in df.columns:
-        analysis_type_name = "YARN 사종별"
-        summary_df = (
-            df.groupby(yarn_col)
-            .agg(
-                Orders=(yarn_col, "count"),
-                Total_Pcs=("__PCS_NUM", "sum"),
-                Total_Kg=("__KG_NUM", "sum"),
-            )
-            .reset_index()
-            .sort_values(by="Orders", ascending=False)
-        )
-        chart_col = yarn_col
+      chart_col = "__ORDER_MONTH"
 
-    with tab4:
-      q_choice = st.radio(
-          "상세 분석 선택",
-          ["장수별 (PCS)", "Kg별 (Weight)", "오더 중복 횟수별 (Frequency)"],
-          horizontal=True,
+    elif analysis_type == "대리점별 (Agency)" and agency_col in df.columns:
+      summary_df = (
+          df.groupby(agency_col)
+          .agg(
+              Orders=(agency_col, "count"),
+              Total_Pcs=("__PCS_NUM", "sum"),
+              Total_Kg=("__KG_NUM", "sum"),
+          )
+          .reset_index()
+          .sort_values(by="Orders", ascending=False)
       )
-      if q_choice == "장수별 (PCS)" and "__PCS_NUM" in df.columns:
-        analysis_type_name = "장수(PCS)별"
-        summary_df = (
-            df.groupby("__PCS_NUM")
-            .agg(
-                Orders=("__PCS_NUM", "count"), Total_Kg=("__KG_NUM", "sum")
-            )
-            .reset_index()
-            .sort_values(by="Orders", ascending=False)
-        )
-        chart_col = "__PCS_NUM"
-      elif q_choice == "Kg별 (Weight)" and "__KG_NUM" in df.columns:
-        analysis_type_name = "중량(Kg)별"
-        summary_df = (
-            df.groupby("__KG_NUM")
-            .agg(
-                Orders=("__KG_NUM", "count"), Total_Pcs=("__PCS_NUM", "sum")
-            )
-            .reset_index()
-            .sort_values(by="Orders", ascending=False)
-        )
-        chart_col = "__KG_NUM"
-      elif (
-          q_choice == "오더 중복 횟수별 (Frequency)"
-          and product_col in df.columns
-      ):
-        analysis_type_name = "오더 중복 횟수별"
-        summary_df = (
-            df.groupby(product_col)
-            .size()
-            .reset_index(name="중복주문횟수")
-            .sort_values(by="중복주문횟수", ascending=False)
-        )
-        chart_col = product_col
+      chart_col = agency_col
+
+    elif (
+        analysis_type == "아이템 이름별 (Product Name)"
+        and product_col in df.columns
+    ):
+      summary_df = (
+          df.groupby(product_col)
+          .agg(
+              Orders=(product_col, "count"),
+              Total_Pcs=("__PCS_NUM", "sum"),
+              Total_Kg=("__KG_NUM", "sum"),
+          )
+          .reset_index()
+          .sort_values(by="Orders", ascending=False)
+      )
+      chart_col = product_col
+
+    elif (
+        analysis_type == "YARN(PILE) 사종별 (Yarn)"
+        and yarn_col
+        and yarn_col in df.columns
+    ):
+      summary_df = (
+          df.groupby(yarn_col)
+          .agg(
+              Orders=(yarn_col, "count"),
+              Total_Pcs=("__PCS_NUM", "sum"),
+              Total_Kg=("__KG_NUM", "sum"),
+          )
+          .reset_index()
+          .sort_values(by="Orders", ascending=False)
+      )
+      chart_col = yarn_col
+
+    elif analysis_type == "장수별 (PCS)" and pcs_col and pcs_col in df.columns:
+      summary_df = (
+          df.groupby("__PCS_NUM")
+          .agg(
+              Orders=("__PCS_NUM", "count"), Total_Kg=("__KG_NUM", "sum")
+          )
+          .reset_index()
+          .sort_values(by="Orders", ascending=False)
+      )
+      chart_col = "__PCS_NUM"
+
+    elif analysis_type == "Kg별 (Weight)" and kg_col and kg_col in df.columns:
+      summary_df = (
+          df.groupby("__KG_NUM")
+          .agg(
+              Orders=("__KG_NUM", "count"), Total_Pcs=("__PCS_NUM", "sum")
+          )
+          .reset_index()
+          .sort_values(by="Orders", ascending=False)
+      )
+      chart_col = "__KG_NUM"
+
+    elif (
+        analysis_type == "오더 중복 횟수별 (Frequency)"
+        and product_col in df.columns
+    ):
+      summary_df = (
+          df.groupby(product_col)
+          .size()
+          .reset_index(name="중복주문횟수")
+          .sort_values(by="중복주문횟수", ascending=False)
+      )
+      chart_col = product_col
 
     st.markdown("---")
 
@@ -568,7 +556,8 @@ try:
         st.info("코멘트를 생성하는 중 오류가 발생했습니다.")
     else:
       st.warning(
-          "해당 조건에 일치하는 데이터가 없거나 필요한 컬럼을 찾을 수 없습니다."
+          "해당 조건에 일치하는 데이터를 찾지 못했거나 스프레드시트에 해당"
+          " 컬럼(Yarn 등)이 존재하지 않습니다."
       )
 
   elif menu == t["menu_5"]:
