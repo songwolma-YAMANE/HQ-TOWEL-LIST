@@ -157,6 +157,7 @@ try:
   ship_col = find_col(["출하처", "SHIPMENT"])
   product_col = find_col(["제품명", "KOREAN NAME"])
   completed_col = find_col(["출고 완료", "출고완료"])
+  order_date_col = find_col(["발주서 수령", "발주서", "수령일"])
 
   pcs_col = find_col(["order pcs", "pcs", "수량"])
   kg_col = find_col(["order kg", "kg", "중량"])
@@ -190,6 +191,13 @@ try:
           .fillna("")
       )
       d_df[date_col] = d_df[date_col].replace("NaT", "")
+    if order_date_col and order_date_col in d_df.columns:
+      d_df[order_date_col] = (
+          pd.to_datetime(d_df[order_date_col], errors="coerce")
+          .dt.strftime("%Y-%m-%d")
+          .fillna("")
+      )
+      d_df[order_date_col] = d_df[order_date_col].replace("NaT", "")
     return d_df
 
 
@@ -222,8 +230,10 @@ try:
     df["__YEAR"] = df["__PARSED_DATE"].dt.year.fillna(0).astype(int)
     df["__MONTH"] = df["__PARSED_DATE"].dt.to_period("M").astype(str)
 
+  if order_date_col and order_date_col in df.columns:
+    df["__ORDER_DATE"] = pd.to_datetime(df[order_date_col], errors="coerce")
+
   if menu == t["menu_1"]:
-    target_d7 = today + timedelta(days=7)
     total_len = len(df)
     completed_count = (
         len(df[df[completed_col].astype(str).str.upper() == "O"])
@@ -241,7 +251,75 @@ try:
       st.metric("Completion Rate", f"{rate}%")
 
     st.markdown("---")
-    st.subheader("Order List")
+
+    # 1. 7일 이내 출고 임박 리스트 (D-7 Delivery Alert)
+    st.subheader("🚨 [긴급] 7일 이내 출고 임박 리스트")
+    if date_col and date_col in df.columns:
+      not_completed = (
+          df[completed_col].astype(str).str.upper() != "O"
+          if (completed_col and completed_col in df.columns)
+          else pd.Series(True, index=df.index)
+      )
+      d7_df = df[
+          not_completed
+          & (df["__PARSED_DATE"] >= today)
+          & (df["__PARSED_DATE"] <= today + timedelta(days=7))
+      ].copy()
+
+      if not d7_df.empty:
+        st.warning(
+            f"총 {len(d7_df)}건의 출고 임박 항목이 있습니다 (7일 이내 납기 도래)"
+        )
+        editor_d7 = d7_df.drop(
+            columns=[
+                "__PARSED_DATE",
+                "__ORDER_DATE",
+                "__YEAR",
+                "__MONTH",
+                "__PCS_NUM",
+                "__KG_NUM",
+            ],
+            errors="ignore",
+        )
+        st.dataframe(format_df_dates(editor_d7), use_container_width=True)
+      else:
+        st.info("향후 7일 이내 출고 임박한 미완료 오더가 없습니다.")
+    else:
+      st.info("납기일(날짜) 컬럼을 찾을 수 없습니다.")
+
+    st.markdown("---")
+
+    # 2. 최근 7일 이내 신규 발주서 수령 아이템 리스트
+    st.subheader("📥 [신규] 최근 7일 이내 발주서 수령 아이템")
+    if order_date_col and order_date_col in df.columns:
+      recent_orders = df[
+          (df["__ORDER_DATE"] >= today - timedelta(days=7))
+          & (df["__ORDER_DATE"] <= today)
+      ].copy()
+
+      if not recent_orders.empty:
+        st.success(
+            f"최근 7일 내 신규 접수된 발주서가 총 {len(recent_orders)}건 있습니다."
+        )
+        editor_recent = recent_orders.drop(
+            columns=[
+                "__PARSED_DATE",
+                "__ORDER_DATE",
+                "__YEAR",
+                "__MONTH",
+                "__PCS_NUM",
+                "__KG_NUM",
+            ],
+            errors="ignore",
+        )
+        st.dataframe(format_df_dates(editor_recent), use_container_width=True)
+      else:
+        st.info("최근 7일 이내에 수령된 신규 발주서 항목이 없습니다.")
+    else:
+      st.info("발주서 수령일 컬럼을 찾을 수 없습니다.")
+
+    st.markdown("---")
+    st.subheader("Order List (전체 오더 목록)")
     search_query = st.text_input(t["search_box"], "")
     filtered_df = df.copy()
     if search_query:
@@ -259,6 +337,7 @@ try:
     editor_df = filtered_df.drop(
         columns=[
             "__PARSED_DATE",
+            "__ORDER_DATE",
             "__YEAR",
             "__MONTH",
             "__PCS_NUM",
