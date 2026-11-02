@@ -355,7 +355,7 @@ try:
     tot_all_pcs = kpi_df["__PCS_NUM"].sum()
     tot_all_kg = kpi_df["__KG_NUM"].sum()
 
-    # 상단 요약 KPI 카드 (선택된 연도 기준)
+    # 상단 요약 KPI 카드 (선택된 연도 기준 - Kg는 소수점 제거 정수 표기 `:,.0f`)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
       st.metric(f"{sel_kpi_year} Total Orders", f"{total_len:,} 건")
@@ -364,7 +364,7 @@ try:
     with col3:
       st.metric(f"{sel_kpi_year} Total PCS", f"{tot_all_pcs:,.0f} PCS")
     with col4:
-      st.metric(f"{sel_kpi_year} Total Weight", f"{tot_all_kg:,.1f} Kg")
+      st.metric(f"{sel_kpi_year} Total Weight", f"{tot_all_kg:,.0f} Kg")
 
     st.markdown("---")
 
@@ -491,7 +491,7 @@ try:
         with c2:
           st.metric("해당월 총 수량", f"{m_pcs:,.0f} PCS")
         with c3:
-          st.metric("해당월 총 중량", f"{m_kg:,.1f} Kg")
+          st.metric("해당월 총 중량", f"{m_kg:,.0f} Kg")
 
         st.markdown("---")
 
@@ -698,7 +698,7 @@ try:
       with m_col2:
         st.metric("Total PCS", f"{tot_pcs:,.0f} PCS")
       with m_col3:
-        st.metric("Total Weight", f"{tot_kg:,.1f} Kg")
+        st.metric("Total Weight", f"{tot_kg:,.0f} Kg")
 
       st.markdown("")
 
@@ -752,10 +752,10 @@ try:
       comment = f"""
             > **[종합 복합 조건 분석 리포트]**
             > - **적용된 다중 조건**: {cond_str}
-            > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
+            > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.0f} ~ {kg_range[1]:,.0f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
-            > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 상단 KPI 요약 카드가 최근 연도 우선 및 연도 선택형으로 개편되었습니다.
+            > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.0f} Kg**이 집계되었습니다.
+            > - 중량 표기에서 소수점이 제거되어 정수형태로 깔끔하게 표시됩니다.
             """
       st.markdown(comment)
 
