@@ -494,3 +494,80 @@ try:
           .sort_values(by="중복주문횟수", ascending=False)
       )
       chart_col = product_col
+
+    if not summary_df.empty:
+      st.dataframe(summary_df, use_container_width=True)
+
+      if chart_col and chart_col in summary_df.columns:
+        try:
+          st.bar_chart(
+              summary_df.set_index(chart_col)[
+                  "Orders"
+                  if "Orders" in summary_df.columns
+                  else summary_df.columns[1]
+              ]
+          )
+        except Exception:
+          pass
+
+      # 자동 코멘트(설명) 생성
+      st.markdown("### 💡 분석 요약 코멘트")
+      try:
+        total_groups = len(summary_df)
+        top_row = summary_df.iloc[0]
+        top_name = top_row.iloc[0]
+        top_orders = (
+            top_row["Orders"] if "Orders" in summary_df.columns else "N/A"
+        )
+        top_kg = (
+            f", 총 중량 {top_row['Total_Kg']:,.1f} Kg"
+            if "Total_Kg" in summary_df.columns
+            else ""
+        )
+        top_pcs = (
+            f", 총 수량 {top_row['Total_Pcs']:,.0f} PCS"
+            if "Total_Pcs" in summary_df.columns
+            else ""
+        )
+        top_freq = (
+            f", 중복 횟수 {top_row['중복주문횟수']}회"
+            if "중복주문횟수" in summary_df.columns
+            else ""
+        )
+
+        comment = f"""
+                > **[AI 자동 분석 리포트]**
+                > - 총 **{total_groups}개**의 분류 항목으로 집계되었습니다.
+                > - 선택하신 **[{analysis_type}]** 기준에서 가장 수치가 높은 상위 항목은 **'{top_name}'**입니다.
+                > - 해당 항목은 오더 건수 **{top_orders}건**{top_kg}{top_pcs}{top_freq}을(를) 기록하며 가장 높은 비중을 차지하고 있습니다.
+                """
+        st.markdown(comment)
+      except Exception:
+        st.info("코멘트를 생성하는 중 오류가 발생했습니다.")
+    else:
+      st.warning(
+          "해당 조건에 일치하는 데이터가 없거나 필요한 컬럼을 찾을 수 없습니다."
+      )
+
+  elif menu == t["menu_5"]:
+    st.subheader("Staff Memos")
+    if ship_col and product_col in df.columns:
+      df["오더표시"] = (
+          df.index.astype(str)
+          + " | "
+          + df[ship_col].astype(str)
+          + " | "
+          + df[product_col].astype(str)
+      )
+      selected_label = st.selectbox("Select Order", df["오더표시"].tolist())
+      idx = int(selected_label.split(" | ")[0])
+      memo = st.text_area(
+          "Enter Memo", value=st.session_state.order_memos.get(idx, "")
+      )
+      if st.button("Save Memo"):
+        st.session_state.order_memos[idx] = memo
+        st.success("Saved!")
+    else:
+      st.warning("Required columns not found.")
+except Exception as e:
+  st.error(f"Error: {e}")
