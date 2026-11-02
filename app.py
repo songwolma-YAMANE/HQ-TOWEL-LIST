@@ -70,37 +70,39 @@ if logo_base64:
 LANG_DICT = {
     "한국어": {
         "title": "📦 본사 문직 제품 수주 및 출고 관리 시스템",
-        "subtitle": "실시간 구글 스프레드시트 연동 대시보드",
-        "sec_menu": "🔐 보안 및 시스템 메뉴",
+        "subtitle": "실시간 구글 스프레드시트 연동 대시보드 (캐싱 및 인증 적용)",
+        "sec_menu": "🔐 보안 및 시스템 로그인",
         "pw_label": "관리자 비밀번호 입력",
         "pw_placeholder": "비밀번호",
-        "admin_success": "🔓 관리자 모드 활성화",
-        "pw_error": "❌ 비밀번호 오류",
-        "general_info": "💡 일반 조회 모드",
+        "admin_success": "🔓 관리자 모드 활성화됨",
+        "pw_error": "❌ 비밀번호가 올바르지 않습니다.",
+        "login_btn": "로그인",
+        "logout_btn": "로그아웃",
+        "general_info": "💡 현재 일반 조회 모드입니다.",
         "menu_1": "📊 대시보드",
         "menu_2": "📅 캘린더",
         "menu_3": "🏢 상세 이력",
         "menu_4": "📈 비교 분석",
         "menu_5": "📝 메모",
         "search_box": "검색",
-        "excel_btn": "엑셀 다운로드",
     },
     "English": {
         "title": "📦 HQ Textile Order & Shipment Management System",
-        "subtitle": "Real-time Google Sheets Dashboard",
-        "sec_menu": "🔐 Security & System Menu",
+        "subtitle": "Real-time Google Sheets Dashboard (Cached & Secured)",
+        "sec_menu": "🔐 Security & System Login",
         "pw_label": "Enter Admin Password",
         "pw_placeholder": "Password",
-        "admin_success": "🔓 Admin mode activated",
-        "pw_error": "❌ Incorrect password",
-        "general_info": "💡 General view mode",
+        "admin_success": "🔓 Admin mode active",
+        "pw_error": "❌ Incorrect password.",
+        "login_btn": "Login",
+        "logout_btn": "Logout",
+        "general_info": "💡 Currently in general view mode.",
         "menu_1": "📊 Dashboard",
         "menu_2": "📅 Calendar",
         "menu_3": "🏢 History",
         "menu_4": "📈 Analysis",
         "menu_5": "📝 Memos",
         "search_box": "Search",
-        "excel_btn": "Download Excel",
     },
 }
 
@@ -113,11 +115,12 @@ t = LANG_DICT[selected_lang]
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=True)
 
-# 구글 스프레드시트 CSV 링크
+# 구글 스프레드시트 CSV 링크 (웹에 게시된 링크)
 url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRg859XPxWPmD549O0AVE7VCCXbqpuccsZ3oj1D55-CQARnPa3eBNRlrNg_-BX-Zh_LlYTgf_llh7oS/pub?output=csv"
 
 
-@st.cache_data(ttl=30)
+# ⚡ 캐싱 기능 적용 (ttl=60초 동안 데이터를 메모리에 캐시하여 속도 최적화)
+@st.cache_data(ttl=60)
 def load_data():
   headers = {
       "User-Agent": (
@@ -202,20 +205,29 @@ try:
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
 
+  # 🔐 로그인 상태 관리 세션 초기화
+  if "is_logged_in" not in st.session_state:
+    st.session_state.is_logged_in = False
+
   st.sidebar.header(t["sec_menu"])
   ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "songwol1234")
-  input_pw = st.sidebar.text_input(
-      t["pw_label"], type="password", placeholder=t["pw_placeholder"]
-  )
-  is_admin = input_pw == ADMIN_PASSWORD
 
-  if is_admin:
-    st.sidebar.success(t["admin_success"])
+  if not st.session_state.is_logged_in:
+    input_pw = st.sidebar.text_input(
+        t["pw_label"], type="password", placeholder=t["pw_placeholder"]
+    )
+    if st.sidebar.button(t["login_btn"]):
+      if input_pw == ADMIN_PASSWORD:
+        st.session_state.is_logged_in = True
+        st.rerun()
+      else:
+        st.sidebar.error(t["pw_error"])
+    st.sidebar.info(t["general_info"])
   else:
-    if input_pw:
-      st.sidebar.error(t["pw_error"])
-    else:
-      st.sidebar.info(t["general_info"])
+    st.sidebar.success(t["admin_success"])
+    if st.sidebar.button(t["logout_btn"]):
+      st.session_state.is_logged_in = False
+      st.rerun()
 
   menu = st.sidebar.radio(
       "Menu",
@@ -382,11 +394,10 @@ try:
         " 확인하실 수 있습니다."
     )
 
-    # 3단 컬럼 레이아웃으로 효율적인 필터 배치
+    # 3단 컬럼 레이아웃으로 필터 배치
     f_col1, f_col2, f_col3 = st.columns(3)
 
     with f_col1:
-      # 1. 연도 선택
       available_years = (
           sorted([y for y in df["__ORDER_YEAR"].unique() if y > 0])
           if "__ORDER_YEAR" in df.columns
@@ -396,7 +407,6 @@ try:
           "📅 연도별 (Year)", available_years, placeholder="전체 연도"
       )
 
-      # 2. 월 선택
       available_months = (
           sorted(df[df["__ORDER_MONTH"] != ""]["__ORDER_MONTH"].unique().tolist())
           if "__ORDER_MONTH" in df.columns
@@ -406,7 +416,6 @@ try:
           "🗓️ 월별 (Month)", available_months, placeholder="전체 월"
       )
 
-      # 3. 대리점 선택
       available_agencies = (
           sorted(df[agency_col].dropna().unique().tolist())
           if agency_col and agency_col in df.columns
@@ -417,7 +426,6 @@ try:
       )
 
     with f_col2:
-      # 4. 출하처 선택
       available_ships = (
           sorted(df[ship_col].dropna().unique().tolist())
           if ship_col and ship_col in df.columns
@@ -427,7 +435,6 @@ try:
           "🚢 출하처별 (Shipment)", available_ships, placeholder="전체 출하처"
       )
 
-      # 5. YARN(사종) 선택
       available_yarns = (
           sorted(df[yarn_col].dropna().unique().tolist())
           if yarn_col and yarn_col in df.columns
@@ -437,7 +444,6 @@ try:
           "🧵 YARN(사종)별", available_yarns, placeholder="전체 사종"
       )
 
-      # 6. 아이템 이름 선택
       available_products = (
           sorted(df[product_col].dropna().unique().tolist())
           if product_col and product_col in df.columns
@@ -448,7 +454,6 @@ try:
       )
 
     with f_col3:
-      # 7. 규격/폭 선택
       available_widths = (
           sorted(df[width_col].dropna().unique().tolist())
           if width_col and width_col in df.columns
@@ -458,7 +463,6 @@ try:
           "📏 규격/폭별 (Width)", available_widths, placeholder="전체 규격"
       )
 
-      # 8. 출고 완료 여부 선택
       available_status = (
           sorted(df[completed_col].dropna().unique().tolist())
           if completed_col and completed_col in df.columns
@@ -470,7 +474,6 @@ try:
           placeholder="전체 상태",
       )
 
-      # 9. 수량(PCS) 및 중량(Kg) 범위 검색 슬라이더
       st.markdown("⚖️ **수량 및 중량 상세 범위**")
       min_pcs, max_pcs = (
           int(df["__PCS_NUM"].min()),
@@ -481,7 +484,6 @@ try:
       )
 
       min_kg, max_kg = float(df["__KG_NUM"].min()), float(df["__KG_NUM"].max())
-      # 값이 모두 0이거나 동일할 경우 예외 처리
       if min_kg == max_kg:
         max_kg = min_kg + 1.0
       kg_range = st.slider(
@@ -527,7 +529,6 @@ try:
           filtered_analysis_df[completed_col].isin(sel_status)
       ]
 
-    # PCS / Kg 슬라이더 범위 필터 적용
     filtered_analysis_df = filtered_analysis_df[
         (filtered_analysis_df["__PCS_NUM"] >= pcs_range[0])
         & (filtered_analysis_df["__PCS_NUM"] <= pcs_range[1])
@@ -541,7 +542,6 @@ try:
     )
 
     if not filtered_analysis_df.empty:
-      # 합계 지표 표시
       tot_pcs = filtered_analysis_df["__PCS_NUM"].sum()
       tot_kg = filtered_analysis_df["__KG_NUM"].sum()
 
@@ -555,7 +555,6 @@ try:
 
       st.markdown("")
 
-      # 결과 데이터프레임 표시 (내부 시스템 컬럼 제외)
       display_analysis_df = filtered_analysis_df.drop(
           columns=[
               "__PARSED_DATE",
@@ -571,7 +570,6 @@ try:
           format_df_dates(display_analysis_df), use_container_width=True
       )
 
-      # AI 자동 분석 리포트 코멘트
       st.markdown("### 💡 AI 멀티 복합 조건 분석 요약 코멘트")
       active_conditions = []
       if sel_years:
@@ -600,18 +598,15 @@ try:
       comment = f"""
             > **[종합 복합 조건 분석 리포트]**
             > - **적용된 다중 조건**: {cond_str}
-            > - **수량(PCS) 및 중량(Kg) 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
+            > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 연도, 월, 대리점, 사종, 아이템뿐만 아니라 규격과 수량 범위까지 완벽하게 교차 분석하여 생산 및 영업 계획에 활용하실 수 있습니다.
+            > - 캐싱 기능이 적용되어 데이터를 더 빠르고 효율적으로 불러오고 있습니다.
             """
       st.markdown(comment)
 
     else:
-      st.warning(
-          "선택하신 다중 복합 조건에 일치하는 오더 데이터가 없습니다. 필터"
-          " 항목을 조금 더 넓게 조정해 보세요."
-      )
+      st.warning("선택하신 다중 복합 조건에 일치하는 오더 데이터가 없습니다.")
 
   elif menu == t["menu_5"]:
     st.subheader("Staff Memos")
