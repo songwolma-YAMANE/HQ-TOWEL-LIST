@@ -70,38 +70,41 @@ if logo_base64:
 LANG_DICT = {
     "한국어": {
         "title": "📦 본사 문직 제품 수주 및 출고 관리 시스템",
-        "subtitle": "실시간 구글 스프레드시트 연동 대시보드 (캐싱 및 인증 적용)",
-        "sec_menu": "🔐 보안 및 시스템 로그인",
-        "pw_label": "관리자 비밀번호 입력",
-        "pw_placeholder": "비밀번호",
-        "admin_success": "🔓 관리자 모드 활성화됨",
+        "subtitle": (
+            "실시간 구글 스프레드시트 연동 대시보드 (다중 권한 및 방문자 통계"
+            " 포함)"
+        ),
+        "sec_menu": "🔐 보안 및 권한 설정",
+        "pw_label": "비밀번호 입력 (일반/관리자)",
+        "pw_placeholder": "비밀번호를 입력하세요",
+        "general_success": "💡 일반 조회 모드 활성화 (songwol1234)",
+        "admin_success": "🔓 최고 관리자 모드 활성화 (diaksp007099)",
         "pw_error": "❌ 비밀번호가 올바르지 않습니다.",
-        "login_btn": "로그인",
         "logout_btn": "로그아웃",
-        "general_info": "💡 현재 일반 조회 모드입니다.",
         "menu_1": "📊 대시보드",
         "menu_2": "📅 캘린더",
         "menu_3": "🏢 상세 이력",
         "menu_4": "📈 비교 분석",
         "menu_5": "📝 메모",
+        "menu_6": "📈 방문자 통계 (관리자 전용)",
         "search_box": "검색",
     },
     "English": {
         "title": "📦 HQ Textile Order & Shipment Management System",
-        "subtitle": "Real-time Google Sheets Dashboard (Cached & Secured)",
-        "sec_menu": "🔐 Security & System Login",
-        "pw_label": "Enter Admin Password",
-        "pw_placeholder": "Password",
+        "subtitle": "Real-time Google Sheets Dashboard (Multi-Role & Analytics)",
+        "sec_menu": "🔐 Security & Access Control",
+        "pw_label": "Enter Password (User/Admin)",
+        "pw_placeholder": "Enter password",
+        "general_success": "💡 General view mode active",
         "admin_success": "🔓 Admin mode active",
         "pw_error": "❌ Incorrect password.",
-        "login_btn": "Login",
         "logout_btn": "Logout",
-        "general_info": "💡 Currently in general view mode.",
         "menu_1": "📊 Dashboard",
         "menu_2": "📅 Calendar",
         "menu_3": "🏢 History",
         "menu_4": "📈 Analysis",
         "menu_5": "📝 Memos",
+        "menu_6": "📈 Visitor Stats (Admin Only)",
         "search_box": "Search",
     },
 }
@@ -115,11 +118,11 @@ t = LANG_DICT[selected_lang]
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=True)
 
-# 구글 스프레드시트 CSV 링크 (웹에 게시된 링크)
+# 구글 스프레드시트 CSV 링크
 url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRg859XPxWPmD549O0AVE7VCCXbqpuccsZ3oj1D55-CQARnPa3eBNRlrNg_-BX-Zh_LlYTgf_llh7oS/pub?output=csv"
 
 
-# ⚡ 캐싱 기능 적용 (ttl=60초 동안 데이터를 메모리에 캐시하여 속도 최적화)
+# ⚡ 캐싱 기능 적용 (ttl=60초)
 @st.cache_data(ttl=60)
 def load_data():
   headers = {
@@ -205,34 +208,73 @@ try:
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
 
-  # 🔐 로그인 상태 관리 세션 초기화
-  if "is_logged_in" not in st.session_state:
-    st.session_state.is_logged_in = False
+  # 세션 상태 관리 (로그인 권한 및 방문자 통계용)
+  if "role" not in st.session_state:
+    st.session_state.role = "general"  # 기본값: 일반 모드
+  if "visitor_count" not in st.session_state:
+    st.session_state.visitor_count = 1255  # 예시 누적 방문자수 초기값
+  if "access_logs" not in st.session_state:
+    st.session_state.access_logs = [
+        {"시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "구분": "시스템 기동"}
+    ]
 
   st.sidebar.header(t["sec_menu"])
-  ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "songwol1234")
 
-  if not st.session_state.is_logged_in:
+  # 비밀번호 설정 (일반: songwol1234, 관리자: diaksp007099)
+  GENERAL_PW = "songwol1234"
+  ADMIN_PW = "diaksp007099"
+
+  if st.session_state.role == "general":
     input_pw = st.sidebar.text_input(
         t["pw_label"], type="password", placeholder=t["pw_placeholder"]
     )
-    if st.sidebar.button(t["login_btn"]):
-      if input_pw == ADMIN_PASSWORD:
-        st.session_state.is_logged_in = True
+    if st.sidebar.button("로그인"):
+      if input_pw == ADMIN_PW:
+        st.session_state.role = "admin"
+        st.session_state.visitor_count += 1
+        st.session_state.access_logs.insert(
+            0, {
+                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "구분": "관리자 로그인",
+            }
+        )
+        st.rerun()
+      elif input_pw == GENERAL_PW:
+        st.session_state.role = "user"
+        st.session_state.visitor_count += 1
+        st.session_state.access_logs.insert(
+            0, {
+                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "구분": "일반 사용자 로그인",
+            }
+        )
         st.rerun()
       else:
         st.sidebar.error(t["pw_error"])
-    st.sidebar.info(t["general_info"])
+    st.sidebar.info(t["general_success"])
   else:
-    st.sidebar.success(t["admin_success"])
+    role_msg = (
+        t["admin_success"]
+        if st.session_state.role == "admin"
+        else "🔓 일반 사용자 모드 활성화됨"
+    )
+    st.sidebar.success(role_msg)
     if st.sidebar.button(t["logout_btn"]):
-      st.session_state.is_logged_in = False
+      st.session_state.role = "general"
       st.rerun()
 
-  menu = st.sidebar.radio(
-      "Menu",
-      [t["menu_1"], t["menu_2"], t["menu_3"], t["menu_4"], t["menu_5"]],
-  )
+  # 메뉴 구성 (관리자일 경우 방문자 통계 메뉴 추가)
+  menu_list = [
+      t["menu_1"],
+      t["menu_2"],
+      t["menu_3"],
+      t["menu_4"],
+      t["menu_5"],
+  ]
+  if st.session_state.role == "admin":
+    menu_list.append(t["menu_6"])
+
+  menu = st.sidebar.radio("Menu", menu_list)
   today = pd.to_datetime(datetime.today().date())
 
   if date_col and date_col in df.columns:
@@ -394,7 +436,6 @@ try:
         " 확인하실 수 있습니다."
     )
 
-    # 3단 컬럼 레이아웃으로 필터 배치
     f_col1, f_col2, f_col3 = st.columns(3)
 
     with f_col1:
@@ -493,7 +534,6 @@ try:
           value=(min_kg, max_kg),
       )
 
-    # 필터링 로직 적용
     filtered_analysis_df = df.copy()
 
     if sel_years:
@@ -601,7 +641,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 캐싱 기능이 적용되어 데이터를 더 빠르고 효율적으로 불러오고 있습니다.
+            > - 캐싱 기능 및 권한 분기가 적용되어 안전하게 운영됩니다.
             """
       st.markdown(comment)
 
@@ -628,5 +668,28 @@ try:
         st.success("Saved!")
     else:
       st.warning("Required columns not found.")
+
+  # 📈 방문자 통계 메뉴 (최고 관리자 전용)
+  elif menu == t["menu_6"] and st.session_state.role == "admin":
+    st.subheader("📈 관리자 전용 방문자 통계 및 접속 로그")
+    st.markdown(
+        "최고 관리자(`diaksp007099`) 권한으로 접속하여 시스템 이용 현황을"
+        " 모니터링합니다."
+    )
+
+    v_col1, v_col2 = st.columns(2)
+    with v_col1:
+      st.metric(
+          label="누적 방문 및 로그인 횟수",
+          value=f"{st.session_state.visitor_count:,} 회",
+      )
+    with v_col2:
+      st.metric(label="현재 접속 권한", value="최고 관리자 (Admin)")
+
+    st.markdown("---")
+    st.subheader("📋 최근 시스템 접속 및 인증 로그")
+    log_df = pd.DataFrame(st.session_state.access_logs)
+    st.dataframe(log_df, use_container_width=True)
+
 except Exception as e:
   st.error(f"Error: {e}")
