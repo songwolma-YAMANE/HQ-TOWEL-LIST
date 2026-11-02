@@ -210,9 +210,9 @@ try:
 
   # 세션 상태 관리 (로그인 권한 및 방문자 통계용)
   if "role" not in st.session_state:
-    st.session_state.role = "general"  # 기본값: 일반 모드
+    st.session_state.role = "general"
   if "visitor_count" not in st.session_state:
-    st.session_state.visitor_count = 1255  # 예시 누적 방문자수 초기값
+    st.session_state.visitor_count = 1255
   if "access_logs" not in st.session_state:
     st.session_state.access_logs = [
         {"시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "구분": "시스템 기동"}
@@ -220,13 +220,15 @@ try:
 
   st.sidebar.header(t["sec_menu"])
 
-  # 비밀번호 설정 (일반: songwol1234, 관리자: diaksp007099)
   GENERAL_PW = "songwol1234"
   ADMIN_PW = "diaksp007099"
 
   if st.session_state.role == "general":
+    # 🔒 type="password"로 설정하여 입력 시 글자가 마스킹(보이지 않음) 처리되도록 함
     input_pw = st.sidebar.text_input(
-        t["pw_label"], type="password", placeholder=t["pw_placeholder"]
+        t["pw_label"],
+        type="password",
+        placeholder=t["pw_placeholder"],
     )
     if st.sidebar.button("로그인"):
       if input_pw == ADMIN_PW:
@@ -263,7 +265,6 @@ try:
       st.session_state.role = "general"
       st.rerun()
 
-  # 메뉴 구성 (관리자일 경우 방문자 통계 메뉴 추가)
   menu_list = [
       t["menu_1"],
       t["menu_2"],
@@ -641,7 +642,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 캐싱 기능 및 권한 분기가 적용되어 안전하게 운영됩니다.
+            > - 캐싱 기능 및 보안 권한 분기가 적용되어 안전하게 운영됩니다.
             """
       st.markdown(comment)
 
