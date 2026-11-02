@@ -22,12 +22,8 @@ st.markdown(
 .brand-logo-container {
     display: flex;
     align-items: center;
+    gap: 20px;
     margin-bottom: 15px;
-}
-.brand-logo {
-    height: 40px;
-    width: auto;
-    object-fit: contain;
 }
 </style>
 """,
@@ -35,10 +31,11 @@ st.markdown(
 )
 
 
-# 💡 로고 이미지를 읽어와서 Base64로 변환하는 함수
+# 💡 이미지를 읽어와서 높이를 강제로 똑같이 맞추고 Base64로 변환하는 함수
 def get_resized_image_base64(image_path, target_height=40):
   try:
     img = Image.open(image_path)
+    # 원본 비율 유지하면서 높이를 target_height로 맞추기
     original_width, original_height = img.size
     aspect_ratio = original_width / original_height
     target_width = int(target_height * aspect_ratio)
@@ -46,22 +43,26 @@ def get_resized_image_base64(image_path, target_height=40):
     img_resized = img.resize(
         (target_width, target_height), Image.Resampling.LANCZOS
     )
+
     buffered = io.BytesIO()
+    # PNG 포맷 유지 (투명 배경 등 보호)
     img_resized.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
   except Exception:
     return ""
 
 
-# 사용할 로고 파일명 설정 (예: logo_korea.png 만 남겨둔 경우)
-logo_base64 = get_resized_image_base64("logo_korea.png", target_height=40)
+# 파일명에 맞게 경로 설정 (현재 폴더에 있는 이미지 사용)
+logo1_base64 = get_resized_image_base64("logo_korea.png", target_height=40)
+logo2_base64 = get_resized_image_base64("logo_vina.png", target_height=40)
 
-# 💡 하나의 로고만 깨끗하게 출력
-if logo_base64:
+# 상단에 두 로고를 나란히 출력
+if logo1_base64 and logo2_base64:
   st.markdown(
       f"""
     <div class="brand-logo-container">
-        <img src="data:image/png;base64,{logo_base64}" class="brand-logo" alt="SONGWOL">
+        <img src="data:image/png;base64,{logo1_base64}" alt="SONGWOL">
+        <img src="data:image/png;base64,{logo2_base64}" alt="SONGWOL VINA">
     </div>
     """,
       unsafe_allow_html=True,
