@@ -3,8 +3,9 @@ import io
 import base64
 from PIL import Image
 import pandas as pd
-import requests
 import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
 
 # 페이지 설정 (와이드 레이아웃)
 st.set_page_config(
@@ -22,8 +23,12 @@ st.markdown(
 .brand-logo-container {
     display: flex;
     align-items: center;
-    gap: 20px;
     margin-bottom: 15px;
+}
+.brand-logo {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
 }
 </style>
 """,
@@ -31,11 +36,10 @@ st.markdown(
 )
 
 
-# 💡 이미지를 읽어와서 높이를 강제로 똑같이 맞추고 Base64로 변환하는 함수
+# 로고 이미지를 읽어와서 Base64로 변환하는 함수
 def get_resized_image_base64(image_path, target_height=40):
   try:
     img = Image.open(image_path)
-    # 원본 비율 유지하면서 높이를 target_height로 맞추기
     original_width, original_height = img.size
     aspect_ratio = original_width / original_height
     target_width = int(target_height * aspect_ratio)
@@ -43,26 +47,21 @@ def get_resized_image_base64(image_path, target_height=40):
     img_resized = img.resize(
         (target_width, target_height), Image.Resampling.LANCZOS
     )
-
     buffered = io.BytesIO()
-    # PNG 포맷 유지 (투명 배경 등 보호)
     img_resized.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
   except Exception:
     return ""
 
 
-# 파일명에 맞게 경로 설정 (현재 폴더에 있는 이미지 사용)
-logo1_base64 = get_resized_image_base64("logo_korea.png", target_height=40)
-logo2_base64 = get_resized_image_base64("logo_vina.png", target_height=40)
+# 하나의 로고만 깔끔하게 출력
+logo_base64 = get_resized_image_base64("logo_korea.png", target_height=40)
 
-# 상단에 두 로고를 나란히 출력
-if logo1_base64 and logo2_base64:
+if logo_base64:
   st.markdown(
       f"""
     <div class="brand-logo-container">
-        <img src="data:image/png;base64,{logo1_base64}" alt="SONGWOL">
-        <img src="data:image/png;base64,{logo2_base64}" alt="SONGWOL VINA">
+        <img src="data:image/png;base64,{logo_base64}" class="brand-logo" alt="SONGWOL">
     </div>
     """,
       unsafe_allow_html=True,
@@ -117,28 +116,39 @@ t = LANG_DICT[selected_lang]
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=True)
 
-# 구글 스프레드시트 CSV 내보내기 링크
-url = "https://docs.google.com/spreadsheets/d/13Lp9gA3p8a_WstCQA9AyMrfzM8YTtqUpBV8Ryxzszjg/export?format=csv"
+# gspread를 이용한 구글 스프레드시트 연동 설정
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/13Lp9gA3p8a_WstCQA9AyMrfzM8YTtqUpBV8Ryxzszjg/edit"
 
 
 @st.cache_data(ttl=30)
 def load_data():
-  headers = {
-      "User-Agent": (
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-      )
-  }
-  res = requests.get(url, headers=headers)
-  res.raise_for_status()
-  df_temp = pd.read_csv(io.BytesIO(res.content), header=None)
+  scope = [
+      "https://spreadsheets.google.com/feeds",
+      "https://www.googleapis.com/auth/drive",
+  ]
+  credentials_dict = dict(st.secrets["gcp_service_account"])
+  creds = Credentials.from_service_account_info(
+      credentials_dict, scopes=scope
+  )
+  client = gspread.authorize(creds)
+
+  sheet = client.open_by_url(SPREADSHEET_URL).get_worksheet(0)
+  data = sheet.get_all_values()
+
+  df_temp = pd.DataFrame(data)
+
   header_row = 0
   for i in range(len(df_temp)):
     row_str = str(df_temp.iloc[i].values)
     if "출하처" in row_str or "SHIPMENT" in row_str or "제품명" in row_str:
       header_row = i
       break
-  data_df = pd.read_csv(io.BytesIO(res.content), header=header_row)
+
+  data_df = pd.DataFrame(
+      df_temp.values[header_row + 1 :], columns=df_temp.iloc[header_row]
+  )
   data_df.columns = data_df.columns.astype(str).str.strip()
+  data_df = data_df.loc[:, data_df.columns != ""]
   return data_df
 
 
