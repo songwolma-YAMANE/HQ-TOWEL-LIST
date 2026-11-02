@@ -70,10 +70,7 @@ if logo_base64:
 LANG_DICT = {
     "한국어": {
         "title": "📦 본사 문직 제품 수주 및 출고 관리 시스템",
-        "subtitle": (
-            "실시간 구글 스프레드시트 연동 대시보드 (다중 권한 및 방문자 통계"
-            " 포함)"
-        ),
+        "subtitle": "실시간 구글 스프레드시트 연동 대시보드 (세션 방문자 통계 포함)",
         "sec_menu": "🔐 보안 및 권한 설정",
         "pw_label": "비밀번호 입력 (일반/관리자)",
         "pw_placeholder": "비밀번호를 입력하세요",
@@ -92,7 +89,9 @@ LANG_DICT = {
     },
     "English": {
         "title": "📦 HQ Textile Order & Shipment Management System",
-        "subtitle": "Real-time Google Sheets Dashboard (Multi-Role & Analytics)",
+        "subtitle": (
+            "Real-time Google Sheets Dashboard (Session Visitor Stats)"
+        ),
         "sec_menu": "🔐 Security & Access Control",
         "pw_label": "Enter Password (User/Admin)",
         "pw_placeholder": "Enter password",
@@ -215,15 +214,32 @@ try:
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
 
-  # 세션 상태 관리 (로그인 권한 및 방문자 통계용)
+  # 🌐 세션 기반 방문자 통계 초기화 (새로고침 중복 방지 및 0부터 시작)
   if "role" not in st.session_state:
     st.session_state.role = "general"
-  if "visitor_count" not in st.session_state:
-    st.session_state.visitor_count = 1255
+  if "visited_this_session" not in st.session_state:
+    st.session_state.visited_this_session = False
+  if "daily_visitors" not in st.session_state:
+    # 날짜별 통계 저장을 위한 딕셔너리 (오늘 날짜 기본 0명 시작)
+    st.session_state.daily_visitors = {
+        datetime.now().strftime("%Y-%m-%d"): 0
+    }
   if "access_logs" not in st.session_state:
-    st.session_state.access_logs = [
-        {"시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "구분": "시스템 기동"}
-    ]
+    st.session_state.access_logs = []
+
+  # 브라우저 세션 최초 접속 시에만 방문자수 1증가 (새로고침 무한증가 방지)
+  if not st.session_state.visited_this_session:
+    st.session_state.visited_this_session = True
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if today_str not in st.session_state.daily_visitors:
+      st.session_state.daily_visitors[today_str] = 0
+    st.session_state.daily_visitors[today_str] += 1
+    st.session_state.access_logs.insert(
+        0, {
+            "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "구분": "신규 세션 접속",
+        }
+    )
 
   st.sidebar.header(t["sec_menu"])
 
@@ -231,7 +247,6 @@ try:
   ADMIN_PW = "diaksp007099"
 
   if st.session_state.role == "general":
-    # 🔒 비밀번호 노출 방지를 위해 type="password" 마스킹 적용 및 안내 문구에서 비밀번호 텍스트 제거
     input_pw = st.sidebar.text_input(
         t["pw_label"],
         type="password",
@@ -240,7 +255,6 @@ try:
     if st.sidebar.button("로그인"):
       if input_pw == ADMIN_PW:
         st.session_state.role = "admin"
-        st.session_state.visitor_count += 1
         st.session_state.access_logs.insert(
             0, {
                 "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -250,7 +264,6 @@ try:
         st.rerun()
       elif input_pw == GENERAL_PW:
         st.session_state.role = "user"
-        st.session_state.visitor_count += 1
         st.session_state.access_logs.insert(
             0, {
                 "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -649,7 +662,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 캐싱 기능 및 새로고침 버튼, 철저한 비밀번호 마스킹 보안이 적용되어 안전하게 운영됩니다.
+            > - 세션 기반 방문자 집계 및 새로고침 중복 방지가 적용되어 있습니다.
             """
       st.markdown(comment)
 
@@ -679,20 +692,29 @@ try:
 
   # 📈 방문자 통계 메뉴 (최고 관리자 전용)
   elif menu == t["menu_6"] and st.session_state.role == "admin":
-    st.subheader("📈 관리자 전용 방문자 통계 및 접속 로그")
+    st.subheader("📈 관리자 전용 날짜별 방문자 통계 및 접속 로그")
     st.markdown(
-        "최고 관리자(`diaksp007099`) 권한으로 접속하여 시스템 이용 현황을"
-        " 모니터링합니다."
+        "최고 관리자(`diaksp007099`) 권한으로 접속하여 세션 기반 일자별 방문"
+        " 현황을 모니터링합니다."
     )
+
+    # 총 누적 방문자 수 계산
+    total_visitors = sum(st.session_state.daily_visitors.values())
 
     v_col1, v_col2 = st.columns(2)
     with v_col1:
-      st.metric(
-          label="누적 방문 및 로그인 횟수",
-          value=f"{st.session_state.visitor_count:,} 회",
-      )
+      st.metric(label="총 누적 방문자수 (세션 기준)", value=f"{total_visitors:,} 명")
     with v_col2:
       st.metric(label="현재 접속 권한", value="최고 관리자 (Admin)")
+
+    st.markdown("---")
+    st.subheader("📅 날짜별 방문자 통계 분석")
+    daily_df = pd.DataFrame(
+        list(st.session_state.daily_visitors.items()),
+        columns=["방문 일자", "방문자 수"],
+    ).sort_values(by="방문 일자", ascending=False)
+    st.dataframe(daily_df, use_container_width=True)
+    st.bar_chart(daily_df.set_index("방문 일자")["방문자 수"])
 
     st.markdown("---")
     st.subheader("📋 최근 시스템 접속 및 인증 로그")
