@@ -77,10 +77,11 @@ LANG_DICT = {
         "sec_menu": "🔐 보안 및 권한 설정",
         "pw_label": "비밀번호 입력 (일반/관리자)",
         "pw_placeholder": "비밀번호를 입력하세요",
-        "general_success": "💡 일반 조회 모드 활성화 (songwol1234)",
-        "admin_success": "🔓 최고 관리자 모드 활성화 (diaksp007099)",
+        "general_success": "💡 일반 조회 모드로 접속 중입니다.",
+        "admin_success": "🔓 최고 관리자 모드로 접속 중입니다.",
         "pw_error": "❌ 비밀번호가 올바르지 않습니다.",
         "logout_btn": "로그아웃",
+        "refresh_btn": "🔄 데이터 새로고침",
         "menu_1": "📊 대시보드",
         "menu_2": "📅 캘린더",
         "menu_3": "🏢 상세 이력",
@@ -95,10 +96,11 @@ LANG_DICT = {
         "sec_menu": "🔐 Security & Access Control",
         "pw_label": "Enter Password (User/Admin)",
         "pw_placeholder": "Enter password",
-        "general_success": "💡 General view mode active",
-        "admin_success": "🔓 Admin mode active",
+        "general_success": "💡 General view mode active.",
+        "admin_success": "🔓 Admin mode active.",
         "pw_error": "❌ Incorrect password.",
         "logout_btn": "Logout",
+        "refresh_btn": "🔄 Refresh Data",
         "menu_1": "📊 Dashboard",
         "menu_2": "📅 Calendar",
         "menu_3": "🏢 History",
@@ -145,6 +147,11 @@ def load_data():
 
 
 try:
+  # 🔄 캐시 초기화(새로고침) 버튼 구현
+  if st.sidebar.button(t["refresh_btn"]):
+    st.cache_data.clear()
+    st.success("캐시가 초기화되었습니다. 최신 데이터를 불러옵니다.")
+
   df = load_data()
 
 
@@ -224,7 +231,7 @@ try:
   ADMIN_PW = "diaksp007099"
 
   if st.session_state.role == "general":
-    # 🔒 type="password"로 설정하여 입력 시 글자가 마스킹(보이지 않음) 처리되도록 함
+    # 🔒 비밀번호 노출 방지를 위해 type="password" 마스킹 적용 및 안내 문구에서 비밀번호 텍스트 제거
     input_pw = st.sidebar.text_input(
         t["pw_label"],
         type="password",
@@ -258,7 +265,7 @@ try:
     role_msg = (
         t["admin_success"]
         if st.session_state.role == "admin"
-        else "🔓 일반 사용자 모드 활성화됨"
+        else "🔓 일반 사용자 모드로 접속 중입니다."
     )
     st.sidebar.success(role_msg)
     if st.sidebar.button(t["logout_btn"]):
@@ -642,7 +649,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 캐싱 기능 및 보안 권한 분기가 적용되어 안전하게 운영됩니다.
+            > - 캐싱 기능 및 새로고침 버튼, 철저한 비밀번호 마스킹 보안이 적용되어 안전하게 운영됩니다.
             """
       st.markdown(comment)
 
