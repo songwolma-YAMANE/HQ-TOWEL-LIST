@@ -70,12 +70,12 @@ LANG_DICT = {
         "login_btn": "로그인",
         "logout_btn": "로그아웃",
         "refresh_btn": "🔄 데이터 새로고침",
+        "excel_btn": "📥 현재 조회 결과 엑셀 다운로드",
         "menu_1": "📊 대시보드",
         "menu_2": "📅 출고 캘린더",
-        "menu_3": "🏢 상세 이력",
-        "menu_4": "📈 비교 분석",
-        "menu_5": "📝 메모",
-        "menu_6": "📈 방문자 통계 (관리자 전용)",
+        "menu_3": "📈 비교 분석",
+        "menu_4": "📝 메모",
+        "menu_5": "📈 방문자 통계 (관리자 전용)",
         "search_box": "검색",
     },
     "English": {
@@ -90,12 +90,12 @@ LANG_DICT = {
         "login_btn": "Login",
         "logout_btn": "Logout",
         "refresh_btn": "🔄 Refresh Data",
+        "excel_btn": "📥 Download Current Data to Excel",
         "menu_1": "📊 Dashboard",
         "menu_2": "📅 Shipment Calendar",
-        "menu_3": "🏢 History",
-        "menu_4": "📈 Analysis",
-        "menu_5": "📝 Memos",
-        "menu_6": "📈 Visitor Stats (Admin Only)",
+        "menu_3": "📈 Analysis",
+        "menu_4": "📝 Memos",
+        "menu_5": "📈 Visitor Stats (Admin Only)",
         "search_box": "Search",
     },
 }
@@ -277,7 +277,6 @@ try:
       else 0
   )
 
-  # 날짜 파싱 안전하게 처리
   if date_col and date_col in df.columns:
     df["__PARSED_DATE"] = pd.to_datetime(df[date_col], errors="coerce")
   else:
@@ -314,15 +313,10 @@ try:
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
 
-  menu_list = [
-      t["menu_1"],
-      t["menu_2"],
-      t["menu_3"],
-      t["menu_4"],
-      t["menu_5"],
-  ]
+  # 📋 메뉴 구성 (상세 이력 제거됨)
+  menu_list = [t["menu_1"], t["menu_2"], t["menu_3"], t["menu_4"]]
   if st.session_state.role == "admin":
-    menu_list.append(t["menu_6"])
+    menu_list.append(t["menu_5"])
 
   menu = st.sidebar.radio("Menu", menu_list)
   today = pd.to_datetime(datetime.today().date())
@@ -334,15 +328,19 @@ try:
         if (completed_col and completed_col in df.columns)
         else 0
     )
+    tot_all_pcs = df["__PCS_NUM"].sum()
+    tot_all_kg = df["__KG_NUM"].sum()
 
-    col1, col2, col3 = st.columns(3)
+    # 상단 요약 KPI 카드 강화
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-      st.metric("Total Orders", f"{total_len:,}")
+      st.metric("Total Orders", f"{total_len:,} 건")
     with col2:
-      st.metric("Completed", f"{completed_count:,}")
+      st.metric("Completed", f"{completed_count:,} 건")
     with col3:
-      rate = int((completed_count / total_len * 100) if total_len > 0 else 0)
-      st.metric("Completion Rate", f"{rate}%")
+      st.metric("Total PCS", f"{tot_all_pcs:,.0f} PCS")
+    with col4:
+      st.metric("Total Weight", f"{tot_all_kg:,.1f} Kg")
 
     st.markdown("---")
 
@@ -411,7 +409,7 @@ try:
       st.info("발주서 수령일 컬럼을 찾을 수 없습니다.")
 
     st.markdown("---")
-    st.subheader("Order List (전체 오더 목록)")
+    st.subheader("Order List (전체 오더 목록 및 검색)")
     search_query = st.text_input(t["search_box"], "")
     filtered_df = df.copy()
     if search_query:
@@ -440,7 +438,7 @@ try:
     st.data_editor(format_df_dates(editor_df), use_container_width=True)
 
   elif menu == t["menu_2"]:
-    # 📅 업그레이드된 출고 캘린더 기능
+    # 📅 출고 캘린더 기능
     st.subheader("📅 Shipment Calendar (월별 출고 일정 캘린더)")
     st.markdown(
         "연도와 월을 선택하여 해당 기간 내에 출고되는 오더 일정을 날짜별로"
@@ -462,7 +460,6 @@ try:
             valid_cal_df["YearMonth"] == selected_ym
         ].sort_values(by="__PARSED_DATE")
 
-        # 요약 지표
         m_pcs = month_df["__PCS_NUM"].sum()
         m_kg = month_df["__KG_NUM"].sum()
         c1, c2, c3 = st.columns(3)
@@ -475,7 +472,6 @@ try:
 
         st.markdown("---")
 
-        # 날짜별 그룹 요약 및 상세 보기 탭
         tab_a, tab_b = st.tabs(
             ["📋 날짜별 출고 오더 상세 목록", "📊 일자별 물동량 요약"]
         )
@@ -517,21 +513,11 @@ try:
       )
 
   elif menu == t["menu_3"]:
-    st.subheader("Agency History")
-    if agency_col in df.columns:
-      selected_target = st.selectbox(
-          "Select Agency", df[agency_col].dropna().unique()
-      )
-      target_df = df[df[agency_col] == selected_target]
-      st.dataframe(format_df_dates(target_df), use_container_width=True)
-    else:
-      st.warning("Agency column not found.")
-
-  elif menu == t["menu_4"]:
     st.subheader("📈 종합 멀티 조건 복합 필터 분석 시스템 (발주일 기준)")
     st.markdown(
         "원하시는 조건들을 **동시에 여러 개 선택(Multi-select)**하여 복합"
-        " 검색하세요."
+        " 검색하세요. 선택한 조건에 맞는 상세 오더 내역과 요약 통계를 바로"
+        " 확인하고 엑셀로 다운로드할 수 있습니다."
     )
 
     f_col1, f_col2, f_col3 = st.columns(3)
@@ -704,8 +690,16 @@ try:
           ],
           errors="ignore",
       )
-      st.dataframe(
-          format_df_dates(display_analysis_df), use_container_width=True
+      formatted_result_df = format_df_dates(display_analysis_df)
+      st.dataframe(formatted_result_df, use_container_width=True)
+
+      # 📥 엑셀(CSV) 다운로드 버튼 추가
+      csv_data = formatted_result_df.to_csv(index=False).encode("utf-8-sig")
+      st.download_button(
+          label=t["excel_btn"],
+          data=csv_data,
+          file_name=f"sonwol_order_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+          mime="text/csv",
       )
 
       st.markdown("### 💡 AI 멀티 복합 조건 분석 요약 코멘트")
@@ -739,14 +733,14 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 캘린더 기능과 보안 로그인, 캐싱이 완벽하게 연동되어 있습니다.
+            > - 상세 이력 메뉴가 간소화되었으며, 엑셀 다운로드를 통해 실무 활용성이 대폭 향상되었습니다.
             """
       st.markdown(comment)
 
     else:
       st.warning("선택하신 다중 복합 조건에 일치하는 오더 데이터가 없습니다.")
 
-  elif menu == t["menu_5"]:
+  elif menu == t["menu_4"]:
     st.subheader("Staff Memos")
     if ship_col and product_col in df.columns:
       df["오더표시"] = (
@@ -768,7 +762,7 @@ try:
       st.warning("Required columns not found.")
 
   # 📈 방문자 통계 메뉴 (최고 관리자 전용)
-  elif menu == t["menu_6"] and st.session_state.role == "admin":
+  elif menu == t["menu_5"] and st.session_state.role == "admin":
     st.subheader("📈 관리자 전용 날짜별 방문자 통계 및 접속 로그")
     st.markdown(
         "최고 관리자(`diaksp007099`) 권한으로 접속하여 세션 기반 일자별 방문"
