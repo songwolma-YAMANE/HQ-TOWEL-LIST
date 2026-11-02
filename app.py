@@ -156,8 +156,6 @@ try:
   product_col = find_col(["제품명", "KOREAN NAME", "품명"])
   completed_col = find_col(["출고 완료", "출고완료"])
   order_date_col = find_col(["발주서 수령", "발주서", "수령일"])
-
-  # 사종(Yarn) 컬럼 정밀 탐색 (pile, yarn, 사종, 번수 등)
   yarn_col = find_col(["yarn", "사종", "번수", "pile", "실"])
 
   pcs_col = find_col(["order pcs", "pcs", "수량", "장수"])
@@ -332,7 +330,7 @@ try:
         )
       if product_col in filtered_df.columns:
         cond = cond | filtered_df[product_col].astype(str).str.contains(
-            search_query, na=False, case=False
+            search_query, nc=False, case=False
         )
       filtered_df = filtered_df[cond]
 
@@ -376,188 +374,145 @@ try:
       st.warning("Agency column not found.")
 
   elif menu == t["menu_4"]:
-    st.subheader("📈 다차원 비교 분석 시스템 (발주일 기준)")
+    st.subheader("📈 멀티 조건 복합 필터 비교 분석 시스템 (발주일 기준)")
 
-    # 가장 직관적이고 효율적인 단일 셀렉트박스 방식으로 개편
-    analysis_type = st.selectbox(
-        "🔍 분석 기준을 선택하세요",
-        [
-            "연도별 (Yearly)",
-            "월별 (Monthly)",
-            "대리점별 (Agency)",
-            "아이템 이름별 (Product Name)",
-            "YARN(PILE) 사종별 (Yarn)",
-            "장수별 (PCS)",
-            "Kg별 (Weight)",
-            "오더 중복 횟수별 (Frequency)",
-        ],
+    st.markdown(
+        "원하시는 조건들을 **동시에 여러 개 선택**하여 조합해 보세요. 선택한"
+        " 조건에 맞는 상세 오더 내역과 요약 통계를 바로 확인하실 수 있습니다."
     )
 
-    summary_df = pd.DataFrame()
-    chart_col = None
-    analysis_type_name = analysis_type
+    # 멀티 필터 입력 UI (2개 컬럼으로 배치하여 깔끔하게 구성)
+    f_col1, f_col2 = st.columns(2)
 
-    if analysis_type == "연도별 (Yearly)" and "__ORDER_YEAR" in df.columns:
-      summary_df = (
-          df[df["__ORDER_YEAR"] > 0]
-          .groupby("__ORDER_YEAR")
-          .agg(
-              Orders=("__ORDER_YEAR", "count"),
-              Total_Pcs=("__PCS_NUM", "sum"),
-              Total_Kg=("__KG_NUM", "sum"),
-          )
-          .reset_index()
+    with f_col1:
+      # 1. 연도 멀티 선택
+      available_years = (
+          sorted([y for y in df["__ORDER_YEAR"].unique() if y > 0])
+          if "__ORDER_YEAR" in df.columns
+          else []
       )
-      chart_col = "__ORDER_YEAR"
+      sel_years = st.multiselect(
+          "📅 연도 선택 (복수 선택 가능)", available_years
+      )
 
-    elif analysis_type == "월별 (Monthly)" and "__ORDER_MONTH" in df.columns:
-      summary_df = (
-          df[df["__ORDER_MONTH"] != ""]
-          .groupby("__ORDER_MONTH")
-          .agg(
-              Orders=("__ORDER_MONTH", "count"),
-              Total_Pcs=("__PCS_NUM", "sum"),
-              Total_Kg=("__KG_NUM", "sum"),
-          )
-          .reset_index()
+      # 2. 대리점 멀티 선택
+      available_agencies = (
+          sorted(df[agency_col].dropna().unique().tolist())
+          if agency_col and agency_col in df.columns
+          else []
       )
-      chart_col = "__ORDER_MONTH"
+      sel_agencies = st.multiselect(
+          "🏢 대리점 선택 (복수 선택 가능)", available_agencies
+      )
 
-    elif analysis_type == "대리점별 (Agency)" and agency_col in df.columns:
-      summary_df = (
-          df.groupby(agency_col)
-          .agg(
-              Orders=(agency_col, "count"),
-              Total_Pcs=("__PCS_NUM", "sum"),
-              Total_Kg=("__KG_NUM", "sum"),
-          )
-          .reset_index()
-          .sort_values(by="Orders", ascending=False)
+    with f_col2:
+      # 3. YARN(사종) 멀티 선택
+      available_yarns = (
+          sorted(df[yarn_col].dropna().unique().tolist())
+          if yarn_col and yarn_col in df.columns
+          else []
       )
-      chart_col = agency_col
+      sel_yarns = st.multiselect(
+          "🧵 YARN(사종) 선택 (복수 선택 가능)", available_yarns
+      )
 
-    elif (
-        analysis_type == "아이템 이름별 (Product Name)"
-        and product_col in df.columns
-    ):
-      summary_df = (
-          df.groupby(product_col)
-          .agg(
-              Orders=(product_col, "count"),
-              Total_Pcs=("__PCS_NUM", "sum"),
-              Total_Kg=("__KG_NUM", "sum"),
-          )
-          .reset_index()
-          .sort_values(by="Orders", ascending=False)
+      # 4. 아이템 이름 멀티 선택
+      available_products = (
+          sorted(df[product_col].dropna().unique().tolist())
+          if product_col and product_col in df.columns
+          else []
       )
-      chart_col = product_col
+      sel_products = st.multiselect(
+          "🏷️ 아이템 이름 선택 (복수 선택 가능)", available_products
+      )
 
-    elif (
-        analysis_type == "YARN(PILE) 사종별 (Yarn)"
-        and yarn_col
-        and yarn_col in df.columns
-    ):
-      summary_df = (
-          df.groupby(yarn_col)
-          .agg(
-              Orders=(yarn_col, "count"),
-              Total_Pcs=("__PCS_NUM", "sum"),
-              Total_Kg=("__KG_NUM", "sum"),
-          )
-          .reset_index()
-          .sort_values(by="Orders", ascending=False)
-      )
-      chart_col = yarn_col
+    # 필터링 로직 적용
+    filtered_analysis_df = df.copy()
 
-    elif analysis_type == "장수별 (PCS)" and pcs_col and pcs_col in df.columns:
-      summary_df = (
-          df.groupby("__PCS_NUM")
-          .agg(
-              Orders=("__PCS_NUM", "count"), Total_Kg=("__KG_NUM", "sum")
-          )
-          .reset_index()
-          .sort_values(by="Orders", ascending=False)
-      )
-      chart_col = "__PCS_NUM"
-
-    elif analysis_type == "Kg별 (Weight)" and kg_col and kg_col in df.columns:
-      summary_df = (
-          df.groupby("__KG_NUM")
-          .agg(
-              Orders=("__KG_NUM", "count"), Total_Pcs=("__PCS_NUM", "sum")
-          )
-          .reset_index()
-          .sort_values(by="Orders", ascending=False)
-      )
-      chart_col = "__KG_NUM"
-
-    elif (
-        analysis_type == "오더 중복 횟수별 (Frequency)"
-        and product_col in df.columns
-    ):
-      summary_df = (
-          df.groupby(product_col)
-          .size()
-          .reset_index(name="중복주문횟수")
-          .sort_values(by="중복주문횟수", ascending=False)
-      )
-      chart_col = product_col
+    if sel_years:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df["__ORDER_YEAR"].isin(sel_years)
+      ]
+    if sel_agencies and agency_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[agency_col].isin(sel_agencies)
+      ]
+    if sel_yarns and yarn_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[yarn_col].isin(sel_yarns)
+      ]
+    if sel_products and product_col:
+      filtered_analysis_df = filtered_analysis_df[
+          filtered_analysis_df[product_col].isin(sel_products)
+      ]
 
     st.markdown("---")
+    st.subheader(
+        f"📊 복합 필터 검색 결과 (총 {len(filtered_analysis_df):,}건)"
+    )
 
-    if not summary_df.empty:
-      st.dataframe(summary_df, use_container_width=True)
+    if not filtered_analysis_df.empty:
+      # 합계 지표 표시
+      tot_pcs = filtered_analysis_df["__PCS_NUM"].sum()
+      tot_kg = filtered_analysis_df["__KG_NUM"].sum()
 
-      if chart_col and chart_col in summary_df.columns:
-        try:
-          st.bar_chart(
-              summary_df.set_index(chart_col)[
-                  "Orders"
-                  if "Orders" in summary_df.columns
-                  else summary_df.columns[1]
-              ]
-          )
-        except Exception:
-          pass
+      m_col1, m_col2, m_col3 = st.columns(3)
+      with m_col1:
+        st.metric("Matching Orders", f"{len(filtered_analysis_df):,} 건")
+      with m_col2:
+        st.metric("Total PCS", f"{tot_pcs:,.0f} PCS")
+      with m_col3:
+        st.metric("Total Weight", f"{tot_kg:,.1f} Kg")
 
-      # 자동 코멘트(설명) 생성
-      st.markdown("### 💡 AI 자동 분석 리포트 코멘트")
-      try:
-        total_groups = len(summary_df)
-        top_row = summary_df.iloc[0]
-        top_name = top_row.iloc[0]
-        top_orders = (
-            top_row["Orders"] if "Orders" in summary_df.columns else "N/A"
-        )
-        top_kg = (
-            f", 총 중량 {top_row['Total_Kg']:,.1f} Kg"
-            if "Total_Kg" in summary_df.columns
-            else ""
-        )
-        top_pcs = (
-            f", 총 수량 {top_row['Total_Pcs']:,.0f} PCS"
-            if "Total_Pcs" in summary_df.columns
-            else ""
-        )
-        top_freq = (
-            f", 중복 횟수 {top_row['중복주문횟수']}회"
-            if "중복주문횟수" in summary_df.columns
-            else ""
-        )
+      st.markdown("")
 
-        comment = f"""
-                > **[발주일 기준 분석 요약]**
-                > - 총 **{total_groups}개**의 분류 항목으로 집계되었습니다.
-                > - 선택하신 **[{analysis_type_name}]** 기준에서 가장 활발한 상위 항목은 **'{top_name}'**입니다.
-                > - 해당 항목은 오더 건수 **{top_orders}건**{top_kg}{top_pcs}{top_freq}을(를) 기록하며 가장 높은 비중을 차지하고 있습니다.
-                """
-        st.markdown(comment)
-      except Exception:
-        st.info("코멘트를 생성하는 중 오류가 발생했습니다.")
+      # 결과 데이터프레임 표시 (내부 시스템 컬럼 제외)
+      display_analysis_df = filtered_analysis_df.drop(
+          columns=[
+              "__PARSED_DATE",
+              "__ORDER_DATE",
+              "__ORDER_YEAR",
+              "__ORDER_MONTH",
+              "__PCS_NUM",
+              "__KG_NUM",
+          ],
+          errors="ignore",
+      )
+      st.dataframe(
+          format_df_dates(display_analysis_df), use_container_width=True
+      )
+
+      # AI 자동 분석 리포트 코멘트
+      st.markdown("### 💡 AI 멀티 조건 분석 요약 코멘트")
+      active_conditions = []
+      if sel_years:
+        active_conditions.append(f"연도: {list(sel_years)}")
+      if sel_agencies:
+        active_conditions.append(f"대리점: {list(sel_agencies)}")
+      if sel_yarns:
+        active_conditions.append(f"사종: {list(sel_yarns)}")
+      if sel_products:
+        active_conditions.append(f"아이템: {list(sel_products)}")
+
+      cond_str = (
+          ", ".join(active_conditions)
+          if active_conditions
+          else "전체 조건 (필터 없음)"
+      )
+
+      comment = f"""
+            > **[복합 조건 분석 리포트]**
+            > - **적용된 검색 조건**: {cond_str}
+            > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
+            > - **누적 수량 및 중량**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
+            > - 다중 필터를 통해 원하시는 특정 년도, 대리점, 사종별 데이터를 정확하게 추출하여 비교 검토하실 수 있습니다.
+            """
+      st.markdown(comment)
+
     else:
       st.warning(
-          "해당 조건에 일치하는 데이터를 찾지 못했거나 스프레드시트에 해당"
-          " 컬럼(Yarn 등)이 존재하지 않습니다."
+          "선택하신 복합 조건에 일치하는 오더 데이터가 없습니다. 필터를"
+          " 조절해 주세요."
       )
 
   elif menu == t["menu_5"]:
