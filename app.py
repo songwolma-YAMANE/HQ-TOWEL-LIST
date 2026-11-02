@@ -3,9 +3,8 @@ import io
 import base64
 from PIL import Image
 import pandas as pd
+import requests
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
 
 # 페이지 설정 (와이드 레이아웃)
 st.set_page_config(
@@ -116,39 +115,28 @@ t = LANG_DICT[selected_lang]
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=True)
 
-# gspread를 이용한 구글 스프레드시트 연동 설정
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/13Lp9gA3p8a_WstCQA9AyMrfzM8YTtqUpBV8Ryxzszjg/edit"
+# 구글 스프레드시트 CSV 내보내기 링크
+url = "https://docs.google.com/spreadsheets/d/13Lp9gA3p8a_WstCQA9AyMrfzM8YTtqUpBV8Ryxzszjg/export?format=csv"
 
 
 @st.cache_data(ttl=30)
 def load_data():
-  scope = [
-      "https://spreadsheets.google.com/feeds",
-      "https://www.googleapis.com/auth/drive",
-  ]
-  credentials_dict = dict(st.secrets["gcp_service_account"])
-  creds = Credentials.from_service_account_info(
-      credentials_dict, scopes=scope
-  )
-  client = gspread.authorize(creds)
-
-  sheet = client.open_by_url(SPREADSHEET_URL).get_worksheet(0)
-  data = sheet.get_all_values()
-
-  df_temp = pd.DataFrame(data)
-
+  headers = {
+      "User-Agent": (
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      )
+  }
+  res = requests.get(url, headers=headers)
+  res.raise_for_status()
+  df_temp = pd.read_csv(io.BytesIO(res.content), header=None)
   header_row = 0
   for i in range(len(df_temp)):
     row_str = str(df_temp.iloc[i].values)
     if "출하처" in row_str or "SHIPMENT" in row_str or "제품명" in row_str:
       header_row = i
       break
-
-  data_df = pd.DataFrame(
-      df_temp.values[header_row + 1 :], columns=df_temp.iloc[header_row]
-  )
+  data_df = pd.read_csv(io.BytesIO(res.content), header=header_row)
   data_df.columns = data_df.columns.astype(str).str.strip()
-  data_df = data_df.loc[:, data_df.columns != ""]
   return data_df
 
 
