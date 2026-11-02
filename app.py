@@ -90,7 +90,6 @@ LANG_DICT = {
         "login_btn": "Login",
         "logout_btn": "Logout",
         "refresh_btn": "🔄 Refresh Data",
-        "excel_btn": "📥 Download Current Data to Excel",
         "menu_1": "📊 Dashboard",
         "menu_2": "📅 Shipment Calendar",
         "menu_3": "📈 Analysis",
@@ -313,7 +312,6 @@ try:
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
 
-  # 📋 메뉴 구성 (상세 이력 제거됨)
   menu_list = [t["menu_1"], t["menu_2"], t["menu_3"], t["menu_4"]]
   if st.session_state.role == "admin":
     menu_list.append(t["menu_5"])
@@ -322,25 +320,51 @@ try:
   today = pd.to_datetime(datetime.today().date())
 
   if menu == t["menu_1"]:
-    total_len = len(df)
+    # 📅 연도별 선택 및 가장 최근 연도 기본 설정
+    available_years = (
+        sorted([y for y in df["__ORDER_YEAR"].unique() if y > 0], reverse=True)
+        if "__ORDER_YEAR" in df.columns
+        else []
+    )
+
+    if available_years:
+      default_year = available_years[0]  # 가장 최근 연도
+      st.subheader(
+          f"📊 실적 요약 대시보드 (기준 연도: {default_year}년 또는 선택 연도)"
+      )
+
+      # 연도 선택 필터 추가
+      sel_kpi_year = st.selectbox(
+          "📅 상단 요약 카드의 조회 연도를 선택하세요",
+          available_years,
+          index=0,
+      )
+
+      # 선택된 연도에 따른 데이터 필터링
+      kpi_df = df[df["__ORDER_YEAR"] == sel_kpi_year]
+    else:
+      kpi_df = df
+      sel_kpi_year = "전체"
+
+    total_len = len(kpi_df)
     completed_count = (
-        len(df[df[completed_col].astype(str).str.upper() == "O"])
-        if (completed_col and completed_col in df.columns)
+        len(kpi_df[kpi_df[completed_col].astype(str).str.upper() == "O"])
+        if (completed_col and completed_col in kpi_df.columns)
         else 0
     )
-    tot_all_pcs = df["__PCS_NUM"].sum()
-    tot_all_kg = df["__KG_NUM"].sum()
+    tot_all_pcs = kpi_df["__PCS_NUM"].sum()
+    tot_all_kg = kpi_df["__KG_NUM"].sum()
 
-    # 상단 요약 KPI 카드 강화
+    # 상단 요약 KPI 카드 (선택된 연도 기준)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-      st.metric("Total Orders", f"{total_len:,} 건")
+      st.metric(f"{sel_kpi_year} Total Orders", f"{total_len:,} 건")
     with col2:
-      st.metric("Completed", f"{completed_count:,} 건")
+      st.metric(f"{sel_kpi_year} Completed", f"{completed_count:,} 건")
     with col3:
-      st.metric("Total PCS", f"{tot_all_pcs:,.0f} PCS")
+      st.metric(f"{sel_kpi_year} Total PCS", f"{tot_all_pcs:,.0f} PCS")
     with col4:
-      st.metric("Total Weight", f"{tot_all_kg:,.1f} Kg")
+      st.metric(f"{sel_kpi_year} Total Weight", f"{tot_all_kg:,.1f} Kg")
 
     st.markdown("---")
 
@@ -438,7 +462,6 @@ try:
     st.data_editor(format_df_dates(editor_df), use_container_width=True)
 
   elif menu == t["menu_2"]:
-    # 📅 출고 캘린더 기능
     st.subheader("📅 Shipment Calendar (월별 출고 일정 캘린더)")
     st.markdown(
         "연도와 월을 선택하여 해당 기간 내에 출고되는 오더 일정을 날짜별로"
@@ -693,7 +716,6 @@ try:
       formatted_result_df = format_df_dates(display_analysis_df)
       st.dataframe(formatted_result_df, use_container_width=True)
 
-      # 📥 엑셀(CSV) 다운로드 버튼 추가
       csv_data = formatted_result_df.to_csv(index=False).encode("utf-8-sig")
       st.download_button(
           label=t["excel_btn"],
@@ -733,7 +755,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 상세 이력 메뉴가 간소화되었으며, 엑셀 다운로드를 통해 실무 활용성이 대폭 향상되었습니다.
+            > - 상단 KPI 요약 카드가 최근 연도 우선 및 연도 선택형으로 개편되었습니다.
             """
       st.markdown(comment)
 
