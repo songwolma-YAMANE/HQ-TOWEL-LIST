@@ -56,27 +56,18 @@ def get_resized_image_base64(image_path, target_height=40):
 # 하나의 로고만 깔끔하게 출력
 logo_base64 = get_resized_image_base64("logo_korea.png", target_height=40)
 
-if logo_base64:
-  st.markdown(
-      f"""
-    <div class="brand-logo-container">
-        <img src="data:image/png;base64,{logo_base64}" class="brand-logo" alt="SONGWOL">
-    </div>
-    """,
-      unsafe_allow_html=True,
-  )
-
 # 다국어 텍스트 사전
 LANG_DICT = {
     "한국어": {
         "title": "📦 본사 문직 제품 수주 및 출고 관리 시스템",
-        "subtitle": "실시간 구글 스프레드시트 연동 대시보드 (세션 방문자 통계 포함)",
-        "sec_menu": "🔐 보안 및 권한 설정",
-        "pw_label": "비밀번호 입력 (일반/관리자)",
+        "subtitle": "실시간 구글 스프레드시트 연동 대시보드 (보안 로그인 적용)",
+        "sec_menu": "🔐 보안 및 로그인",
+        "pw_label": "비밀번호 입력",
         "pw_placeholder": "비밀번호를 입력하세요",
-        "general_success": "💡 일반 조회 모드로 접속 중입니다.",
         "admin_success": "🔓 최고 관리자 모드로 접속 중입니다.",
+        "general_success": "🔓 일반 조회 모드로 접속 중입니다.",
         "pw_error": "❌ 비밀번호가 올바르지 않습니다.",
+        "login_btn": "로그인",
         "logout_btn": "로그아웃",
         "refresh_btn": "🔄 데이터 새로고침",
         "menu_1": "📊 대시보드",
@@ -89,15 +80,14 @@ LANG_DICT = {
     },
     "English": {
         "title": "📦 HQ Textile Order & Shipment Management System",
-        "subtitle": (
-            "Real-time Google Sheets Dashboard (Session Visitor Stats)"
-        ),
-        "sec_menu": "🔐 Security & Access Control",
-        "pw_label": "Enter Password (User/Admin)",
+        "subtitle": "Real-time Google Sheets Dashboard (Secure Login)",
+        "sec_menu": "🔐 Security & Login",
+        "pw_label": "Enter Password",
         "pw_placeholder": "Enter password",
-        "general_success": "💡 General view mode active.",
         "admin_success": "🔓 Admin mode active.",
+        "general_success": "🔓 General view mode active.",
         "pw_error": "❌ Incorrect password.",
+        "login_btn": "Login",
         "logout_btn": "Logout",
         "refresh_btn": "🔄 Refresh Data",
         "menu_1": "📊 Dashboard",
@@ -110,10 +100,103 @@ LANG_DICT = {
     },
 }
 
+# 세션 상태 초기화 (로그인 상태 관리)
+if "role" not in st.session_state:
+  st.session_state.role = "logged_out"  # 초기값: 로그아웃 상태
+if "visited_this_session" not in st.session_state:
+  st.session_state.visited_this_session = False
+if "daily_visitors" not in st.session_state:
+  st.session_state.daily_visitors = {datetime.now().strftime("%Y-%m-%d"): 0}
+if "access_logs" not in st.session_state:
+  st.session_state.access_logs = []
+
 # 사이드바 언어 선택
 st.sidebar.markdown("---")
 selected_lang = st.sidebar.selectbox("🌐 Language", ["한국어", "English"])
 t = LANG_DICT[selected_lang]
+
+GENERAL_PW = "songwol1234"
+ADMIN_PW = "diaksp007099"
+
+# 🔒 [로그아웃 상태인 경우]: 대시보드 내용을 아예 숨기고 로그인 화면만 표시
+if st.session_state.role == "logged_out":
+  # 두 번째 사진 스타일로 로고와 타이틀을 로그인 화면 상단에 배치
+  if logo_base64:
+    st.markdown(
+        f"""
+        <div class="brand-logo-container">
+            <img src="data:image/png;base64,{logo_base64}" class="brand-logo" alt="SONGWOL">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+  st.markdown(
+      f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True
+  )
+  st.markdown(
+      f'<div class="sub-header">안전한 로그인을 위해 비밀번호를 입력해 주세요.</div>',
+      unsafe_allow_html=True,
+  )
+
+  st.markdown("---")
+
+  # 중앙 집중형 로그인 박스 생성
+  col1, col2, col3 = st.columns([1, 2, 1])
+  with col2:
+    st.subheader("🔐 시스템 접근 인증")
+    input_pw = st.text_input(
+        t["pw_label"], type="password", placeholder=t["pw_placeholder"]
+    )
+    if st.button(t["login_btn"], use_container_width=True):
+      if input_pw == ADMIN_PW:
+        st.session_state.role = "admin"
+        # 세션 방문자 통계 처리
+        if not st.session_state.visited_this_session:
+          st.session_state.visited_this_session = True
+          today_str = datetime.now().strftime("%Y-%m-%d")
+          if today_str not in st.session_state.daily_visitors:
+            st.session_state.daily_visitors[today_str] = 0
+          st.session_state.daily_visitors[today_str] += 1
+        st.session_state.access_logs.insert(
+            0, {
+                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "구분": "관리자 로그인",
+            }
+        )
+        st.rerun()
+      elif input_pw == GENERAL_PW:
+        st.session_state.role = "user"
+        if not st.session_state.visited_this_session:
+          st.session_state.visited_this_session = True
+          today_str = datetime.now().strftime("%Y-%m-%d")
+          if today_str not in st.session_state.daily_visitors:
+            st.session_state.daily_visitors[today_str] = 0
+          st.session_state.daily_visitors[today_str] += 1
+        st.session_state.access_logs.insert(
+            0, {
+                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "구분": "일반 사용자 로그인",
+            }
+        )
+        st.rerun()
+      else:
+        st.error(t["pw_error"])
+  st.stop()  # 로그인 전에는 아래 코드가 실행되지 않도록 완전히 차단
+
+# ==========================================
+# 🔓 [로그인 성공 이후 대시보드 영역]
+# ==========================================
+
+# 로고 출력
+if logo_base64:
+  st.markdown(
+      f"""
+    <div class="brand-logo-container">
+        <img src="data:image/png;base64,{logo_base64}" class="brand-logo" alt="SONGWOL">
+    </div>
+    """,
+      unsafe_allow_html=True,
+  )
 
 # 타이틀 적용
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
@@ -123,7 +206,6 @@ st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=
 url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRg859XPxWPmD549O0AVE7VCCXbqpuccsZ3oj1D55-CQARnPa3eBNRlrNg_-BX-Zh_LlYTgf_llh7oS/pub?output=csv"
 
 
-# ⚡ 캐싱 기능 적용 (ttl=60초)
 @st.cache_data(ttl=60)
 def load_data():
   headers = {
@@ -146,10 +228,21 @@ def load_data():
 
 
 try:
-  # 🔄 캐시 초기화(새로고침) 버튼 구현
+  # 사이드바에 로그아웃 버튼 및 새로고침 배치
+  st.sidebar.header(t["sec_menu"])
   if st.sidebar.button(t["refresh_btn"]):
     st.cache_data.clear()
-    st.success("캐시가 초기화되었습니다. 최신 데이터를 불러옵니다.")
+    st.success("캐시가 초기화되었습니다.")
+
+  role_msg = (
+      t["admin_success"]
+      if st.session_state.role == "admin"
+      else t["general_success"]
+  )
+  st.sidebar.success(role_msg)
+  if st.sidebar.button(t["logout_btn"]):
+    st.session_state.role = "logged_out"
+    st.rerun()
 
   df = load_data()
 
@@ -213,77 +306,6 @@ try:
 
   if "order_memos" not in st.session_state:
     st.session_state.order_memos = {}
-
-  # 🌐 세션 기반 방문자 통계 초기화 (새로고침 중복 방지 및 0부터 시작)
-  if "role" not in st.session_state:
-    st.session_state.role = "general"
-  if "visited_this_session" not in st.session_state:
-    st.session_state.visited_this_session = False
-  if "daily_visitors" not in st.session_state:
-    # 날짜별 통계 저장을 위한 딕셔너리 (오늘 날짜 기본 0명 시작)
-    st.session_state.daily_visitors = {
-        datetime.now().strftime("%Y-%m-%d"): 0
-    }
-  if "access_logs" not in st.session_state:
-    st.session_state.access_logs = []
-
-  # 브라우저 세션 최초 접속 시에만 방문자수 1증가 (새로고침 무한증가 방지)
-  if not st.session_state.visited_this_session:
-    st.session_state.visited_this_session = True
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    if today_str not in st.session_state.daily_visitors:
-      st.session_state.daily_visitors[today_str] = 0
-    st.session_state.daily_visitors[today_str] += 1
-    st.session_state.access_logs.insert(
-        0, {
-            "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "구분": "신규 세션 접속",
-        }
-    )
-
-  st.sidebar.header(t["sec_menu"])
-
-  GENERAL_PW = "songwol1234"
-  ADMIN_PW = "diaksp007099"
-
-  if st.session_state.role == "general":
-    input_pw = st.sidebar.text_input(
-        t["pw_label"],
-        type="password",
-        placeholder=t["pw_placeholder"],
-    )
-    if st.sidebar.button("로그인"):
-      if input_pw == ADMIN_PW:
-        st.session_state.role = "admin"
-        st.session_state.access_logs.insert(
-            0, {
-                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "구분": "관리자 로그인",
-            }
-        )
-        st.rerun()
-      elif input_pw == GENERAL_PW:
-        st.session_state.role = "user"
-        st.session_state.access_logs.insert(
-            0, {
-                "시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "구분": "일반 사용자 로그인",
-            }
-        )
-        st.rerun()
-      else:
-        st.sidebar.error(t["pw_error"])
-    st.sidebar.info(t["general_success"])
-  else:
-    role_msg = (
-        t["admin_success"]
-        if st.session_state.role == "admin"
-        else "🔓 일반 사용자 모드로 접속 중입니다."
-    )
-    st.sidebar.success(role_msg)
-    if st.sidebar.button(t["logout_btn"]):
-      st.session_state.role = "general"
-      st.rerun()
 
   menu_list = [
       t["menu_1"],
@@ -662,7 +684,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 세션 기반 방문자 집계 및 새로고침 중복 방지가 적용되어 있습니다.
+            > - 로그인 인증 후 모든 기능이 안전하게 제공됩니다.
             """
       st.markdown(comment)
 
@@ -698,7 +720,6 @@ try:
         " 현황을 모니터링합니다."
     )
 
-    # 총 누적 방문자 수 계산
     total_visitors = sum(st.session_state.daily_visitors.values())
 
     v_col1, v_col2 = st.columns(2)
