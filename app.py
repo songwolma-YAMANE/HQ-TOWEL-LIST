@@ -71,7 +71,7 @@ LANG_DICT = {
         "logout_btn": "로그아웃",
         "refresh_btn": "🔄 데이터 새로고침",
         "menu_1": "📊 대시보드",
-        "menu_2": "📅 캘린더",
+        "menu_2": "📅 출고 캘린더",
         "menu_3": "🏢 상세 이력",
         "menu_4": "📈 비교 분석",
         "menu_5": "📝 메모",
@@ -91,7 +91,7 @@ LANG_DICT = {
         "logout_btn": "Logout",
         "refresh_btn": "🔄 Refresh Data",
         "menu_1": "📊 Dashboard",
-        "menu_2": "📅 Calendar",
+        "menu_2": "📅 Shipment Calendar",
         "menu_3": "🏢 History",
         "menu_4": "📈 Analysis",
         "menu_5": "📝 Memos",
@@ -100,9 +100,9 @@ LANG_DICT = {
     },
 }
 
-# 세션 상태 초기화 (로그인 상태 관리)
+# 세션 상태 초기화
 if "role" not in st.session_state:
-  st.session_state.role = "logged_out"  # 초기값: 로그아웃 상태
+  st.session_state.role = "logged_out"
 if "visited_this_session" not in st.session_state:
   st.session_state.visited_this_session = False
 if "daily_visitors" not in st.session_state:
@@ -118,9 +118,8 @@ t = LANG_DICT[selected_lang]
 GENERAL_PW = "songwol1234"
 ADMIN_PW = "diaksp007099"
 
-# 🔒 [로그아웃 상태인 경우]: 대시보드 내용을 아예 숨기고 로그인 화면만 표시
+# 🔒 [로그아웃 상태인 경우]: 로그인 화면만 표시
 if st.session_state.role == "logged_out":
-  # 두 번째 사진 스타일로 로고와 타이틀을 로그인 화면 상단에 배치
   if logo_base64:
     st.markdown(
         f"""
@@ -140,7 +139,6 @@ if st.session_state.role == "logged_out":
 
   st.markdown("---")
 
-  # 중앙 집중형 로그인 박스 생성
   col1, col2, col3 = st.columns([1, 2, 1])
   with col2:
     st.subheader("🔐 시스템 접근 인증")
@@ -150,7 +148,6 @@ if st.session_state.role == "logged_out":
     if st.button(t["login_btn"], use_container_width=True):
       if input_pw == ADMIN_PW:
         st.session_state.role = "admin"
-        # 세션 방문자 통계 처리
         if not st.session_state.visited_this_session:
           st.session_state.visited_this_session = True
           today_str = datetime.now().strftime("%Y-%m-%d")
@@ -181,13 +178,12 @@ if st.session_state.role == "logged_out":
         st.rerun()
       else:
         st.error(t["pw_error"])
-  st.stop()  # 로그인 전에는 아래 코드가 실행되지 않도록 완전히 차단
+  st.stop()
 
 # ==========================================
 # 🔓 [로그인 성공 이후 대시보드 영역]
 # ==========================================
 
-# 로고 출력
 if logo_base64:
   st.markdown(
       f"""
@@ -198,11 +194,9 @@ if logo_base64:
       unsafe_allow_html=True,
   )
 
-# 타이틀 적용
 st.markdown(f'<div class="main-header">{t["title"]}</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="sub-header">{t["subtitle"]}</div>', unsafe_allow_html=True)
 
-# 구글 스프레드시트 CSV 링크
 url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRg859XPxWPmD549O0AVE7VCCXbqpuccsZ3oj1D55-CQARnPa3eBNRlrNg_-BX-Zh_LlYTgf_llh7oS/pub?output=csv"
 
 
@@ -228,7 +222,6 @@ def load_data():
 
 
 try:
-  # 사이드바에 로그아웃 버튼 및 새로고침 배치
   st.sidebar.header(t["sec_menu"])
   if st.sidebar.button(t["refresh_btn"]):
     st.cache_data.clear()
@@ -284,6 +277,20 @@ try:
       else 0
   )
 
+  # 날짜 파싱 안전하게 처리
+  if date_col and date_col in df.columns:
+    df["__PARSED_DATE"] = pd.to_datetime(df[date_col], errors="coerce")
+  else:
+    df["__PARSED_DATE"] = pd.NaT
+
+  if order_date_col and order_date_col in df.columns:
+    df["__ORDER_DATE"] = pd.to_datetime(df[order_date_col], errors="coerce")
+    df["__ORDER_YEAR"] = df["__ORDER_DATE"].dt.year.fillna(0).astype(int)
+    df["__ORDER_MONTH"] = df["__ORDER_DATE"].dt.to_period("M").astype(str)
+  else:
+    df["__ORDER_YEAR"] = 0
+    df["__ORDER_MONTH"] = ""
+
 
   def format_df_dates(input_df):
     d_df = input_df.copy()
@@ -320,17 +327,6 @@ try:
   menu = st.sidebar.radio("Menu", menu_list)
   today = pd.to_datetime(datetime.today().date())
 
-  if date_col and date_col in df.columns:
-    df["__PARSED_DATE"] = pd.to_datetime(df[date_col], errors="coerce")
-
-  if order_date_col and order_date_col in df.columns:
-    df["__ORDER_DATE"] = pd.to_datetime(df[order_date_col], errors="coerce")
-    df["__ORDER_YEAR"] = df["__ORDER_DATE"].dt.year.fillna(0).astype(int)
-    df["__ORDER_MONTH"] = df["__ORDER_DATE"].dt.to_period("M").astype(str)
-  else:
-    df["__ORDER_YEAR"] = 0
-    df["__ORDER_MONTH"] = ""
-
   if menu == t["menu_1"]:
     total_len = len(df)
     completed_count = (
@@ -350,7 +346,6 @@ try:
 
     st.markdown("---")
 
-    # 1. 7일 이내 출고 임박 리스트
     st.subheader("🚨 [긴급] 7일 이내 출고 임박 리스트")
     if date_col and date_col in df.columns:
       not_completed = (
@@ -387,7 +382,6 @@ try:
 
     st.markdown("---")
 
-    # 2. 최근 7일 이내 신규 발주서 수령 아이템 리스트
     st.subheader("📥 [신규] 최근 7일 이내 발주서 수령 아이템")
     if order_date_col and order_date_col in df.columns:
       recent_orders = df[
@@ -446,19 +440,81 @@ try:
     st.data_editor(format_df_dates(editor_df), use_container_width=True)
 
   elif menu == t["menu_2"]:
-    st.subheader("Shipment Calendar")
+    # 📅 업그레이드된 출고 캘린더 기능
+    st.subheader("📅 Shipment Calendar (월별 출고 일정 캘린더)")
+    st.markdown(
+        "연도와 월을 선택하여 해당 기간 내에 출고되는 오더 일정을 날짜별로"
+        " 확인하세요."
+    )
+
     if date_col in df.columns:
-      valid_df = df.dropna(subset=[date_col]).copy()
-      valid_df["YearMonth"] = valid_df[date_col].dt.to_period("M").astype(str)
-      ym_list = sorted(valid_df["YearMonth"].unique(), reverse=True)
-      if ym_list:
-        selected_ym = st.selectbox("Select Year-Month", ym_list)
-        month_df = valid_df[valid_df["YearMonth"] == selected_ym]
-        st.dataframe(format_df_dates(month_df), use_container_width=True)
+      valid_cal_df = df.dropna(subset=["__PARSED_DATE"]).copy()
+      if not valid_cal_df.empty:
+        valid_cal_df["YearMonth"] = (
+            valid_cal_df["__PARSED_DATE"].dt.to_period("M").astype(str)
+        )
+        ym_list = sorted(valid_cal_df["YearMonth"].unique(), reverse=True)
+
+        selected_ym = st.selectbox(
+            "📅 조회할 연도-월 선택 (Year-Month)", ym_list
+        )
+        month_df = valid_cal_df[
+            valid_cal_df["YearMonth"] == selected_ym
+        ].sort_values(by="__PARSED_DATE")
+
+        # 요약 지표
+        m_pcs = month_df["__PCS_NUM"].sum()
+        m_kg = month_df["__KG_NUM"].sum()
+        c1, c2, c3 = st.columns(3)
+        with c1:
+          st.metric("해당월 총 오더 건수", f"{len(month_df):,} 건")
+        with c2:
+          st.metric("해당월 총 수량", f"{m_pcs:,.0f} PCS")
+        with c3:
+          st.metric("해당월 총 중량", f"{m_kg:,.1f} Kg")
+
+        st.markdown("---")
+
+        # 날짜별 그룹 요약 및 상세 보기 탭
+        tab_a, tab_b = st.tabs(
+            ["📋 날짜별 출고 오더 상세 목록", "📊 일자별 물동량 요약"]
+        )
+
+        with tab_a:
+          display_m_df = month_df.drop(
+              columns=[
+                  "__PARSED_DATE",
+                  "__ORDER_DATE",
+                  "__ORDER_YEAR",
+                  "__ORDER_MONTH",
+                  "__PCS_NUM",
+                  "__KG_NUM",
+                  "YearMonth",
+              ],
+              errors="ignore",
+          )
+          st.dataframe(format_df_dates(display_m_df), use_container_width=True)
+
+        with tab_b:
+          daily_summary = (
+              month_df.groupby(month_df["__PARSED_DATE"].dt.strftime("%Y-%m-%d"))
+              .agg(
+                  Orders=("__PCS_NUM", "count"),
+                  Total_Pcs=("__PCS_NUM", "sum"),
+                  Total_Kg=("__KG_NUM", "sum"),
+              )
+              .reset_index()
+              .rename(columns={"__PARSED_DATE": "출고일자"})
+          )
+          st.dataframe(daily_summary, use_container_width=True)
+          st.bar_chart(daily_summary.set_index("출고일자")["Total_Pcs"])
+
       else:
-        st.warning("No date data.")
+        st.warning("캘린더에 표시할 유효한 날짜 데이터가 없습니다.")
     else:
-      st.warning("Date column not found.")
+      st.warning(
+          "스프레드시트에서 날짜(납기일) 관련 컬럼을 찾을 수 없습니다."
+      )
 
   elif menu == t["menu_3"]:
     st.subheader("Agency History")
@@ -475,8 +531,7 @@ try:
     st.subheader("📈 종합 멀티 조건 복합 필터 분석 시스템 (발주일 기준)")
     st.markdown(
         "원하시는 조건들을 **동시에 여러 개 선택(Multi-select)**하여 복합"
-        " 검색하세요. 선택한 조건에 맞는 상세 오더 내역과 요약 통계를 바로"
-        " 확인하실 수 있습니다."
+        " 검색하세요."
     )
 
     f_col1, f_col2, f_col3 = st.columns(3)
@@ -684,7 +739,7 @@ try:
             > - **수량 및 중량 범위**: PCS({pcs_range[0]} ~ {pcs_range[1]}), Kg({kg_range[0]:,.1f} ~ {kg_range[1]:,.1f})
             > - **조회된 총 오더 건수**: {len(filtered_analysis_df):,}건
             > - **누적 집계**: 총 수량 **{tot_pcs:,.0f} PCS**, 총 중량 **{tot_kg:,.1f} Kg**이 집계되었습니다.
-            > - 로그인 인증 후 모든 기능이 안전하게 제공됩니다.
+            > - 캘린더 기능과 보안 로그인, 캐싱이 완벽하게 연동되어 있습니다.
             """
       st.markdown(comment)
 
